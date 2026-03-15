@@ -2,7 +2,6 @@
 ### LogitDiff: logit lens diffing for transformers
 #### Supports architectures such as: LLaMA, Qwen, Mistral, GPT2, GPT Neox
 #### Supports BitsAndBytes configs
-#### 
 
 # Installation:
 ## From source (recommended for development):
@@ -12,5 +11,5 @@
 ## From GitHub:
 ### pip install git+https://github.com/AnnemetteBP/logit-diff-lens.git
 
-# Heatmap Plotter Example:
+# LogitDiff Heatmap Plotter Example (Jaccard@5):
 ![Alt text](assests/logit_diff_heatmap_example.png)
