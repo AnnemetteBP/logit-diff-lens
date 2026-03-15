@@ -13,4 +13,4 @@
 ### pip install git+https://github.com/AnnemetteBP/logit-diff-lens.git
 
 # Heatmap Plotter Example:
-{% include_relative base_vs_risky_model_norm_jacc@5_1.html %}
+{% include_relative assests/logit_diff_heatmap_example.html %}
