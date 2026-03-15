@@ -1,0 +1,13 @@
+*__pycache__*
+
+.logit-diff-lens-env/
+
+.env
+
+Qwen/
+ModelOrganismsForEM/
+
+figures/
+logit_diffing_data/
+
+example_notebooks/

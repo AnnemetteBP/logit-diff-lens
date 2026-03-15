@@ -1,0 +1,21 @@
+Metadata-Version: 2.4
+Name: logit-diff-lens
+Version: 0.0.1
+Summary: LogitDiff: logit lens diffing for transformers
+Author: Annemette Brok Pirchert
+License-File: LICENSE
+Requires-Dist: torch
+Requires-Dist: transformers
+Requires-Dist: accelerate
+Requires-Dist: bitsandbytes
+Requires-Dist: kernel
+Requires-Dist: scipy
+Requires-Dist: pandas
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: seaborn
+Requires-Dist: colorcet
+Requires-Dist: plotly
+Requires-Dist: kaleido
+Requires-Dist: tqdm
+Dynamic: license-file

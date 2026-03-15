@@ -1,0 +1,14 @@
+torch
+transformers
+accelerate
+bitsandbytes
+kernel
+scipy
+pandas
+numpy
+matplotlib
+seaborn
+colorcet
+plotly
+kaleido
+tqdm
