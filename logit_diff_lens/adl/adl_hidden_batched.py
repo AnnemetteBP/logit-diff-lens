@@ -8,7 +8,6 @@ from ..wrapper.arch_wrapper import ArchWrapper
 
 
 
-
 @torch.no_grad()
 def _collect_hidden_for_adl(
     arch_wrapper: "ArchWrapper",
@@ -211,7 +210,7 @@ def _collect_hidden_for_adl(
 
 
 # ============================================================
-# Public Logit Lens collector
+# Hidden for ADL collector
 # ============================================================
 @torch.no_grad()
 def collect_hidden_for_adl(
