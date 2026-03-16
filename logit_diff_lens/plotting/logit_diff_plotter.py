@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 from ..wrapper.arch_wrapper import ArchWrapper
-from ..utils.logit_diff_prompt import collect_logit_diff_topk
+from ..ldl.logit_diff_prompt import collect_logit_diff_topk
 
 
 

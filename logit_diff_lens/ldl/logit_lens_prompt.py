@@ -41,7 +41,7 @@ def _compute_logit_lens_topk(result:dict, topk:int=5) -> dict:
     mode = result["mode"]
 
     # --------------------------------------------------
-    # CRITICAL FIX: USE result["layers"] ORDER
+    # result["layers"] ORDER
     # --------------------------------------------------
     indices = []
     for layer_id, m in result["layers"]:

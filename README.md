@@ -1,7 +1,6 @@
 # logit-diff-lens
-### LogitDiff: logit lens diffing for transformers
-#### Supports architectures such as: LLaMA, Qwen, Mistral, GPT2, GPT Neox
-#### Supports BitsAndBytes configs
+### LogitDiff: LDL & ADL
+#### Supports various architectures
 
 # Installation:
 ## From source (recommended for development):

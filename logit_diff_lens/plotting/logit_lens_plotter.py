@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 
 from ..wrapper.arch_wrapper import ArchWrapper
-from ..utils.logit_lens_prompt import collect_logit_lens_topk
+from ..ldl.logit_lens_prompt import collect_logit_lens_topk
 
 
 
