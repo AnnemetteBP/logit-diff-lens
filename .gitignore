@@ -3,7 +3,6 @@
 .logit-diff-lens-env/
 
 .env
-.gitignore
 
 Qwen/
 ModelOrganismsForEM/
