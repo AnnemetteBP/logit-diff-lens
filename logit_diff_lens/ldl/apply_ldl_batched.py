@@ -12,13 +12,10 @@ def save_jsonl(records: List, path: str):
         for r in records:
             f.write(json.dumps(r) + "\n")
 
-
-#eps = 1e-8
-
 # ============================================================
 # helpers
 # ============================================================
-def ensure_3d(x: torch.Tensor) -> torch.Tensor:
+def _ensure_3d(x: torch.Tensor) -> torch.Tensor:
     if x.dim() == 3:
         return x
     if x.dim() == 2:
@@ -28,19 +25,18 @@ def ensure_3d(x: torch.Tensor) -> torch.Tensor:
     raise ValueError(f"Unexpected shape: {x.shape}")
 
 
-def ensure_2d(t: torch.Tensor) -> torch.Tensor:
+def _ensure_2d(t: torch.Tensor) -> torch.Tensor:
     if t.dim() == 2:
         return t
     if t.dim() == 1:
         return t.unsqueeze(0)
     raise ValueError(f"Expected [B,L], got {t.shape}")
 
-
 # ============================================================
 # extract modes (collector-correct)
 # hidden is shared; modes come from logits_*
 # ============================================================
-def extract_modes(row: Any) -> Dict:
+def _extract_modes(row: Any) -> Dict:
     hidden = row.get("hidden")
     if hidden is None:
         return {}
@@ -51,11 +47,10 @@ def extract_modes(row: Any) -> Dict:
             out[mode] = (hidden, v)
     return out
 
-
 # ============================================================
 # preprocess rows -> layers[lid][mode] = {hidden, logits, target}
 # ============================================================
-def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
+def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
     layers = {}
 
     for r in rows:
@@ -65,8 +60,8 @@ def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
 
         pid = r["prompt_id"]
 
-        tokens = ensure_2d(r["tokens"])
-        hidden_full = ensure_3d(r["hidden"])
+        tokens = _ensure_2d(r["tokens"])
+        hidden_full = _ensure_3d(r["hidden"])
 
         assert tokens.size(1) == hidden_full.size(1)
 
@@ -81,7 +76,7 @@ def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
             if mode not in norm_modes:
                 continue
 
-            logits = ensure_3d(v)[:, :-1]
+            logits = _ensure_3d(v)[:, :-1]
 
             L = min(hidden.size(1), logits.size(1), target.size(1))
 
@@ -135,7 +130,7 @@ def stable_js(pA, logpA, pB, logpB, eps=1e-12):
 # ============================================================
 # top-k metrics 
 # ============================================================
-def compute_topk_metrics(
+def _compute_topk_metrics(
         pA: Any,
         pB: Any,
         tgt: Any,
@@ -219,7 +214,7 @@ def compute_topk_metrics(
 # ============================================================
 # cross-model metrics 
 # ============================================================
-def compute_cross(
+def _compute_cross(
     A: Dict[int, Dict[str, dict]],
     B: Dict[int, Dict[str, dict]],
     topk: Tuple = (1,5,10),
@@ -319,7 +314,7 @@ def compute_cross(
                 norm_diff = norm_A - norm_B
 
                 # ---------- top-k ----------
-                topk_metrics = compute_topk_metrics(pA, pB, tgt, topk=topk)
+                topk_metrics = _compute_topk_metrics(pA, pB, tgt, topk=topk)
                 for k, v in topk_metrics.items():
                     if torch.is_tensor(v):
                         assert_finite(v, k)
@@ -383,7 +378,7 @@ def compute_cross(
 
 
 @torch.no_grad()
-def collect_logitdiff_batches(
+def apply_ldl(
     dir_A: str,
     dir_B: str,
     output_dir: str = None,
@@ -419,11 +414,11 @@ def collect_logitdiff_batches(
         rows_B = obj_B["rows"]
 
         # ---------- PREPROCESS ----------
-        layers_A = preprocess_rows(rows_A, norm_modes=norm_modes)
-        layers_B = preprocess_rows(rows_B, norm_modes=norm_modes)
+        layers_A = _preprocess_rows(rows_A, norm_modes=norm_modes)
+        layers_B = _preprocess_rows(rows_B, norm_modes=norm_modes)
 
         # ---------- COMPUTE ----------
-        records = compute_cross(
+        records = _compute_cross(
             layers_A,
             layers_B,
             topk=topk,

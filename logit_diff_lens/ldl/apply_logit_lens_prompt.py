@@ -11,7 +11,7 @@ from .collect_logits_prompt import collect_logits_for_plotter
 # Compute top-k metrics from logit-lens collector result
 # --------------------------------------------------------
 @torch.no_grad()
-def _compute_logit_lens_topk(result:dict, topk:int=5) -> dict:
+def _apply_logit_lens_plotter(result:dict, topk:int=5) -> dict:
 
     def _softmax_stats(logits):
         log_p = F.log_softmax(logits.float(), dim=-1)
@@ -130,7 +130,7 @@ def _compute_logit_lens_topk(result:dict, topk:int=5) -> dict:
 # ------------------------------------------------------------
 # Public function for calling logit lens and plotter
 # ------------------------------------------------------------
-def collect_logit_lens_topk(
+def apply_logit_lens_plotter(
     arch_wrapper:"ArchWrapper",
     prompt:str,
     norm_mode:str="raw",
@@ -150,7 +150,7 @@ def collect_logit_lens_topk(
         force_include_output=force_include_output,
     )
 
-    result = _compute_logit_lens_topk(
+    result = _apply_logit_lens_plotter(
         result=lens_result,
         topk=topk,
     )

@@ -11,7 +11,7 @@ from .collect_logits_prompt import collect_logits_for_plotter
 # LogitDiff: comparing result from two logit lenses
 # --------------------------------------------------------
 @torch.no_grad()
-def _compare_logit_diff_topk(
+def _apply_ldl_plotter(
     result_A:dict,
     result_B:dict,
     compute_metric:str="gt_prob_diff",
@@ -195,7 +195,7 @@ def _compare_logit_diff_topk(
 # --------------------------------------------------------
 # Public function to run LogitDiff and plotter
 # --------------------------------------------------------
-def collect_logit_diff_topk(
+def apply_ldl_plotter(
     arch_wrappers:tuple["ArchWrapper", "ArchWrapper"],
     prompt:str,
     norm_mode:str="raw",
@@ -272,7 +272,7 @@ def collect_logit_diff_topk(
     # ---------------------------------------------------------------------
     # Compute comparison metrics
     # ---------------------------------------------------------------------
-    result = _compare_logit_diff_topk(
+    result = _apply_ldl_plotter(
         result_A=result_A,
         result_B=result_B,
         compute_metric=compute_metric,

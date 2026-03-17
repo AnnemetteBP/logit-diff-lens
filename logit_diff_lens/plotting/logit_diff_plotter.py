@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 import plotly.io as pio
 
 from ..wrapper.arch_wrapper import ArchWrapper
-from ..ldl.logit_diff_prompt import collect_logit_diff_topk
+from ..ldl.apply_ldl_prompt import apply_ldl_plotter
 
 
 
@@ -574,7 +574,7 @@ def plot_logit_diff(
     )
 
     # Run the collector
-    results = collect_logit_diff_topk(
+    results = apply_ldl_plotter(
         arch_wrappers=arch_wrappers,
         prompt=prompt,
         norm_mode=norm_mode,

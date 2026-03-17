@@ -14,7 +14,7 @@ def tensor_digest(t):
 
 
 @torch.no_grad()
-def _collect_logit_lens_batches(
+def _collect_logit_for_ldl(
     arch_wrapper: "ArchWrapper",
     prompts: list[str],
     batch_index: int = 0,
@@ -261,7 +261,7 @@ def _collect_logit_lens_batches(
 # Public Logit Lens collector
 # ============================================================
 @torch.no_grad()
-def collect_logits_lens_batches(
+def collect_logits_for_ldl(
     arch_wrapper: "ArchWrapper",
     all_prompts: list[str],
     batch_size: int = 10,
@@ -290,7 +290,7 @@ def collect_logits_lens_batches(
         print(f"\n[batch {batch_idx+1}/{num_batches}] {len(batch_prompts)} prompts → {save_path}")
 
         try:
-            rows, hidden_dict, logits_dict, all_attn = _collect_logit_lens_batches(
+            rows, hidden_dict, logits_dict, all_attn = _collect_logit_for_ldl(
                 arch_wrapper=arch_wrapper,
                 prompts=batch_prompts,
                 batch_index=batch_idx,

@@ -12,7 +12,7 @@ from ..wrapper.arch_wrapper import ArchWrapper
 # ============================================================
 # helpers
 # ============================================================
-def ensure_3d(x: torch.Tensor) -> torch.Tensor:
+def _ensure_3d(x: torch.Tensor) -> torch.Tensor:
     if x.dim() == 3:
         return x
     if x.dim() == 2:
@@ -22,7 +22,7 @@ def ensure_3d(x: torch.Tensor) -> torch.Tensor:
     raise ValueError(f"Unexpected shape: {x.shape}")
 
 
-def ensure_2d(t: torch.Tensor) -> torch.Tensor:
+def _ensure_2d(t: torch.Tensor) -> torch.Tensor:
     if t.dim() == 2:
         return t
     if t.dim() == 1:
@@ -32,7 +32,7 @@ def ensure_2d(t: torch.Tensor) -> torch.Tensor:
 # ============================================================
 # preprocess rows
 # ============================================================
-def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
+def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
     layers = {}
 
     for r in rows:
@@ -42,7 +42,7 @@ def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
 
         pid = r["prompt_id"]
 
-        tokens = ensure_2d(r["tokens"])
+        tokens = _ensure_2d(r["tokens"])
 
         target = tokens[:, 1:]
 
@@ -54,7 +54,7 @@ def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
             if mode not in norm_modes:
                 continue
 
-            hidden = ensure_3d(v)[:, :-1]
+            hidden = _ensure_3d(v)[:, :-1]
 
             L = min(hidden.size(1), target.size(1))
 
@@ -77,11 +77,12 @@ def preprocess_rows(rows: List[dict], norm_modes) -> Dict:
 # ============================================================
 @torch.no_grad()
 def _apply_adl(
-    arch_wrapper,
-    layers_A,
-    layers_B,
-    norm_modes=("raw", "model_norm"),
+    arch_wrapper:"ArchWrapper",
+    layers_A:Dict,
+    layers_B:Dict,
+    norm_modes:Tuple[str, ...]=("raw", "model_norm"),
 ):
+
     rows = []
 
     for lid in sorted(layers_A.keys()):
@@ -126,11 +127,11 @@ def _apply_adl(
 # Run ADL
 # ============================================================
 def apply_adl(
-    arch_wrapper,
-    dir_A,
-    dir_B,
-    output_dir,
-    norm_modes=("raw", "model_norm"),
+    arch_wrapper:"ArchWrapper",
+    dir_A:str,
+    dir_B:str,
+    output_dir:str|Path,
+    norm_modes:Tuple[str, ...]=("raw", "model_norm"),
 ):
 
     os.makedirs(output_dir, exist_ok=True)
@@ -139,6 +140,8 @@ def apply_adl(
     files_B = sorted(f for f in os.listdir(dir_B) if f.endswith(".pt"))
 
     assert len(files_A) == len(files_B)
+
+    print(f"[ADL] Running apply ADL...")
 
     for batch_idx, (fa, fb) in enumerate(zip(files_A, files_B)):
 
@@ -153,8 +156,8 @@ def apply_adl(
         rows_A = obj_A["rows"]
         rows_B = obj_B["rows"]
 
-        layers_A = preprocess_rows(rows_A, norm_modes)
-        layers_B = preprocess_rows(rows_B, norm_modes)
+        layers_A = _preprocess_rows(rows_A, norm_modes)
+        layers_B = _preprocess_rows(rows_B, norm_modes)
 
         records = _apply_adl(
             arch_wrapper,

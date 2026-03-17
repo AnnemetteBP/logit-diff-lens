@@ -1,26 +1,26 @@
 from . import collect_logits_prompt
-from . import logit_lens_batched
-from . import logit_diff_batched
-from . import logit_lens_prompt
-from . import logit_diff_prompt
+from . import collect_ldl_logits_batched
+from . import apply_ldl_batched
+from . import apply_logit_lens_prompt
+from . import apply_ldl_prompt
 
 from .collect_logits_prompt import collect_logits_for_plotter
-from .logit_lens_batched import collect_logits_lens_batches
-from .logit_diff_batched import collect_logitdiff_batches
-from .logit_lens_prompt import collect_logit_lens_topk
-from .logit_diff_prompt import collect_logit_diff_topk
+from .collect_ldl_logits_batched import collect_logits_for_ldl
+from .apply_ldl_batched import apply_ldl
+from .apply_logit_lens_prompt import apply_logit_lens_plotter
+from .apply_ldl_prompt import apply_ldl_plotter
 
 
 
 __all__ = [
     "collect_logits_prompt",
     "collect_logits_for_plotter",
-    "logit_lens_batched",
-    "collect_logits_lens_batches",
-    "logit_diff_batched",
-    "collect_logitdiff_batches",
-    "logit_lens_prompt",
-    "collect_logit_lens_topk",
-    "logit_diff_prompt",
-    "collect_logit_diff_topk"
+    "collect_ldl_logits_batched",
+    "collect_logits_for_ldl",
+    "apply_ldl_batched",
+    "apply_ldl",
+    "apply_logit_lens_prompt",
+    "apply_logit_lens_plotter",
+    "apply_ldl_prompt",
+    "apply_ldl_plotter"
 ]
