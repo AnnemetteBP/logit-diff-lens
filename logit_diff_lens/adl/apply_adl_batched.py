@@ -44,6 +44,7 @@ def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
 
         tokens = _ensure_2d(r["tokens"])
 
+        input_tokens = tokens[:, :-1]
         target = tokens[:, 1:]
 
         for k, v in r.items():
@@ -63,6 +64,7 @@ def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
                 .setdefault(mode, {}) \
                 [pid] = {
                     "hidden": hidden[:, :L].float(),
+                    "input_tokens": input_tokens[:, :L].float(),
                     "target": target[:, :L].long(),
                     "batch_index": r["batch_index"],
                     "prompt_id": pid,
@@ -70,7 +72,6 @@ def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
                 }
 
     return layers
-
 
 # ============================================================
 # ADL
@@ -164,7 +165,8 @@ def _apply_adl(
                     "layer_index": lid,
                     "mode": mode,
 
-                    "tokens": rec_A["target"].cpu(),
+                    "tokens": rec_A["input_tokens"].cpu(),
+                    "target_tokens": rec_A["target"].cpu(),
 
                     # ALL LOGITS 
                     "logits_delta": logits_delta.cpu(),

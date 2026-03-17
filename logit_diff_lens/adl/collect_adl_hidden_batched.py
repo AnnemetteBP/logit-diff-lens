@@ -69,11 +69,12 @@ def _collect_hidden_for_adl(
             start, end = 0, T
 
         tokens_view = tokens[:, start:end].cpu()
+
         print(f"[TOKENS VIEW] {tokens_view}")
 
         if force_include_input and "embedding" in acts:
             hidden_full = acts["embedding"]
-            hidden_view = hidden_full[:, start:end]
+            hidden_view = hidden_full[:, start:end-1]
 
             rec = {
                 "prompt_id": b,
@@ -95,13 +96,12 @@ def _collect_hidden_for_adl(
                 h_norm = arch_wrapper.apply_normalization(
                     hidden_full.clone(), mode=m, block="embedding", layer_index=-1
                 )
-                h_view = h_norm[:, start:end]
+                #h_view = h_norm[:, start:end-1]
                 rec[f"hidden_{m}"] = (
-                    arch_wrapper.save_to_fp32(h_view)
+                    arch_wrapper.save_to_fp32(h_norm)
                     if arch_wrapper.fp32_save
-                    else h_view.detach().cpu()
+                    else h_norm.detach().cpu()
                 )
-
             rows.append(rec)
 
         layers = sorted(
@@ -142,11 +142,11 @@ def _collect_hidden_for_adl(
                 h_norm = arch_wrapper.apply_normalization(
                     hidden_full.clone(), mode=m, block="block", layer_index=idx
                 )
-                h_view = h_norm[:, start:end]
+               # h_view = h_norm[:, start:end-1]
                 rec[f"hidden_{m}"] = (
-                    arch_wrapper.save_to_fp32(h_view)
+                    arch_wrapper.save_to_fp32(h_norm)
                     if arch_wrapper.fp32_save
-                    else h_view.detach().cpu()
+                    else h_norm.detach().cpu()
                 )
 
             rows.append(rec)
@@ -155,7 +155,7 @@ def _collect_hidden_for_adl(
 
         if force_include_output and last_act is not None:
             hidden_full = last_act
-            hidden_view = hidden_full[:, start:end]
+            hidden_view = hidden_full[:, start:end-1]
             out_idx = last_idx + 1
 
             rec = {
@@ -178,11 +178,11 @@ def _collect_hidden_for_adl(
                 h_norm = arch_wrapper.apply_normalization(
                     hidden_full.clone(), mode=m, block="output", layer_index=out_idx
                 )
-                h_view = h_norm[:, start:end]
+                #h_view = h_norm[:, start:end-1]
                 rec[f"hidden_{m}"] = (
-                    arch_wrapper.save_to_fp32(h_view)
+                    arch_wrapper.save_to_fp32(h_norm)
                     if arch_wrapper.fp32_save
-                    else h_view.detach().cpu()
+                    else h_norm.detach().cpu()
                 )
 
             rows.append(rec)

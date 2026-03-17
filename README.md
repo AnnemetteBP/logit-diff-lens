@@ -10,5 +10,10 @@
 ## From GitHub:
 ### pip install git+https://github.com/AnnemetteBP/logit-diff-lens.git
 
-# LogitDiff Heatmap Plotter Example (Jaccard@5):
-![Alt text](assests/logit_diff_heatmap_example.png)
+# LogitDiff Heatmap Plotter Examples:
+## LDL Jaccard@5:
+![Alt text](assests/ldl_raw_jacc@5.png)
+![Alt text](assests/ldl_model_norm_jacc@5.png)
+## ADL KL(Δ || A):
+![Alt text](assests/adl_raw_kl.png)
+![Alt text](assests/adl_model_norm_kl.png)

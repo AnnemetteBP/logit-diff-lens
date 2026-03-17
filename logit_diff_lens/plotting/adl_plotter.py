@@ -81,7 +81,8 @@ def _build_adl_plot_data(rows, tokenizer, mode, metric):
         if tokens is None:
             token_ids = r["tokens"][0].tolist()
             tokens = tokenizer.convert_ids_to_tokens(token_ids)
-            target_tokens = tokens[1:] + [""]
+            target_ids = r["target_tokens"][0].tolist()
+            target_tokens = tokenizer.convert_ids_to_tokens(target_ids)
 
     return {
         "metrics": metrics,
@@ -497,7 +498,7 @@ def _plot_adl_heatmap(
 # Public API
 # ------------------------------------------------------------
 def plot_adl_heatmap(
-    arch_wrappers: Tuple["ArchWrapper", "ArchWrapper"],
+    arch_wrappers: "ArchWrapper" | Tuple["ArchWrapper", "ArchWrapper"],
     prompt: str,
     norm_mode: str = "raw", # ("raw", "unit_norm", "eps_norm", "model_norm")
     add_special_tokens: bool = True,
@@ -522,7 +523,8 @@ def plot_adl_heatmap(
     delta_norm: bool = False,
     ground_truth_probs: bool = False,
     entropy: bool = False,
-    kl_div: bool = False
+    kl_div: bool = False,
+    plot_data_from_file : str | None = None,
 ) -> None|go.Figure|Any:
 
     
@@ -534,57 +536,62 @@ def plot_adl_heatmap(
         "delta_logit_max"
     )
 
-    wrapper_A, wrapper_B = arch_wrappers[0], arch_wrappers[1]
-    
-    # Run the collector for A (base - LM-head applied in adl)
-    collect_hidden_for_adl(
-        arch_wrapper=wrapper_A,
-        all_prompts=prompt,
-        batch_size=1,
-        save_prefix=f"{save_path}_A/{save_prefix}_A",
-        add_special_tokens=add_special_tokens,
-        analyze_special_tokens=analyze_special_tokens,
-        force_include_input=force_include_input,
-        force_include_output=force_include_output,
-        device=wrapper_A.model_device,
-        norm_modes=(norm_mode,),
-        dataset="adl_prompt"
-    )
+    if plot_data_from_file is None:
+        assert isinstance(arch_wrappers, Tuple)
+        wrapper_A, wrapper_B = arch_wrappers[0], arch_wrappers[1]
+        # Run the collector for A (base - LM-head applied in adl)
+        collect_hidden_for_adl(
+            arch_wrapper=wrapper_A,
+            all_prompts=prompt,
+            batch_size=1,
+            save_prefix=f"{save_path}_A/{save_prefix}_A",
+            add_special_tokens=add_special_tokens,
+            analyze_special_tokens=analyze_special_tokens,
+            force_include_input=force_include_input,
+            force_include_output=force_include_output,
+            device=wrapper_A.model_device,
+            norm_modes=(norm_mode,),
+            dataset="adl_prompt"
+        )
 
-    # Run the collector for B
-    collect_hidden_for_adl(
-        arch_wrapper=wrapper_B,
-        all_prompts=prompt,
-        batch_size=1,
-        save_prefix=f"{save_path}_B/{save_prefix}_B",
-        add_special_tokens=add_special_tokens,
-        analyze_special_tokens=analyze_special_tokens,
-        force_include_input=force_include_input,
-        force_include_output=force_include_output,
-        device=wrapper_A.model_device,
-        norm_modes=(norm_mode,),
-        dataset="adl_prompt"
-    )
+        # Run the collector for B
+        collect_hidden_for_adl(
+            arch_wrapper=wrapper_B,
+            all_prompts=prompt,
+            batch_size=1,
+            save_prefix=f"{save_path}_B/{save_prefix}_B",
+            add_special_tokens=add_special_tokens,
+            analyze_special_tokens=analyze_special_tokens,
+            force_include_input=force_include_input,
+            force_include_output=force_include_output,
+            device=wrapper_A.model_device,
+            norm_modes=(norm_mode,),
+            dataset="adl_prompt"
+        )
 
-    adl_res = apply_adl_plotter(
-        arch_wrapper=wrapper_A,
-        dir_A=f"{save_path}_A",
-        dir_B=f"{save_path}_B",
-        output_dir=f"{save_path}_adl"
-    )
+        adl_res = apply_adl_plotter(
+            arch_wrapper=wrapper_A,
+            dir_A=f"{save_path}_A",
+            dir_B=f"{save_path}_B",
+            output_dir=f"{save_path}_adl"
+        )
 
 
-    rows = adl_res["rows"]
+        rows = adl_res["rows"]
+
+    else:
+        wrapper_A = arch_wrappers[0] if isinstance(arch_wrappers, Tuple) else arch_wrappers
+        adl_res = torch.load(plot_data_from_file, weights_only=False, map_location="cpu")
+        rows = adl_res["rows"]
+
 
     if len(rows) == 0:
         raise ValueError("No ADL rows found")
 
-    mode = rows[0]["mode"]
-
     data = _build_adl_plot_data(
         rows,
         tokenizer=wrapper_A.tokenizer,
-        mode=mode,
+        mode=norm_mode,
         metric=metric
     )
 
@@ -616,7 +623,7 @@ def plot_adl_heatmap(
         #fig.write_image("heatmap.png")
         pio.write_image(
             fig,
-            f"{save_path}/heatmap_{mode}.png",
+            f"{save_path}/{metric}_heatmap_{norm_mode}.png",
             format="png",
             scale=4,          
             engine="kaleido",
