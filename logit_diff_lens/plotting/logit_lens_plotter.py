@@ -4,6 +4,7 @@ import numpy as np
 from matplotlib import cm, colors
 from plotly.subplots import make_subplots
 import plotly.graph_objects as go
+import plotly.io as pio
 
 from ..wrapper.arch_wrapper import ArchWrapper
 from ..ldl.apply_logit_lens_prompt import apply_logit_lens_plotter
@@ -49,7 +50,7 @@ def _make_layer_names(
     return names
 
 
-def _plot_logit_lens(
+def _plot_logit_lens_heatmap(
     data: Dict,
     metric: str = "jaccard",
     mode: str = "raw",
@@ -487,7 +488,7 @@ def _plot_logit_lens(
 # ------------------------------------------------------------
 # Public API
 # ------------------------------------------------------------
-def plot_logit_lens(
+def plot_logit_lens_heatmap(
     arch_wrapper:"ArchWrapper",
     prompt:str,
     norm_mode: str = "raw", # ("raw", "unit_norm", "eps_norm", "model_norm")
@@ -565,7 +566,7 @@ def plot_logit_lens(
     metric_key = f"{metric}_{norm_mode}" if f"{metric}_{norm_mode}" in results["metrics"] else metric
 
     # Plot results
-    fig = _plot_logit_lens(
+    fig = _plot_logit_lens_heatmap(
         data=results,
         metric=metric_key,
         mode=norm_mode,
@@ -587,9 +588,17 @@ def plot_logit_lens(
     )
 
     if save_path is not None:
-        #fig.write_html("heatmap.html")
         #fig.write_image("heatmap.png")
-        fig.write_html(save_path)
+        pio.write_image(
+            fig,
+            f"{save_path}/heatmap_{norm_mode}.png",
+            format="png",
+            scale=4,      
+            engine="kaleido",
+            width=1800,
+            height=1500,
+        )
+        fig.write_html(f"{save_path}.html")
         print(f"[SAVED HTML] {save_path}")
     
     return fig

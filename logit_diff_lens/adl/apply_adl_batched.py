@@ -77,10 +77,11 @@ def _preprocess_rows(rows: List[dict], norm_modes) -> Dict:
 # ============================================================
 @torch.no_grad()
 def _apply_adl(
-    arch_wrapper:"ArchWrapper",
-    layers_A:Dict,
-    layers_B:Dict,
-    norm_modes:Tuple[str, ...]=("raw", "model_norm"),
+    arch_wrapper,
+    layers_A,
+    layers_B,
+    norm_modes=("raw", "model_norm"),
+    topk=10,
 ):
 
     rows = []
@@ -104,23 +105,87 @@ def _apply_adl(
                 hA = rec_A["hidden"]
                 hB = rec_B["hidden"]
 
-                # ADL difference
+                # Δh
                 delta = hA - hB
-                delta_norm = torch.norm(delta, dim=-1).mean().item()
+                delta_norm = torch.norm(delta, dim=-1)  # [B, L]
 
-                # project via LM head
-                logits, _ = arch_wrapper.project(delta)
+                # projections
+                logits_delta, _ = arch_wrapper.project(delta)
+                logits_A, _ = arch_wrapper.project(hA)
+                logits_B, _ = arch_wrapper.project(hB)
+
+                # ensure 3D
+                if logits_delta.dim() == 2:
+                    logits_delta = logits_delta.unsqueeze(0)
+                if logits_A.dim() == 2:
+                    logits_A = logits_A.unsqueeze(0)
+                if logits_B.dim() == 2:
+                    logits_B = logits_B.unsqueeze(0)
+
+                # ---------------------------
+                # ADL DISTRIBUTION
+                # ---------------------------
+                p_delta = torch.softmax(logits_delta, dim=-1)
+
+                # ---------------------------
+                # ADL METRICS
+                # ---------------------------
+
+                # strength
+                delta_logit_max = logits_delta.max(dim=-1).values
+
+                # entropy (Δ space)
+                entropy_delta = -(p_delta * torch.log(p_delta + 1e-9)).sum(dim=-1)
+
+                # ground truth prob (Δ)
+                target = rec_A["target"]
+                if target.dim() == 1:
+                    target = target.unsqueeze(0)
+
+                gt_prob_delta = torch.gather(
+                    p_delta, -1, target.unsqueeze(-1)
+                ).squeeze(-1)
+
+                # KL(Δ || A)
+                p_A = torch.softmax(logits_A, dim=-1)
+                kl_delta_vs_A = (
+                    p_delta * (torch.log(p_delta + 1e-9) - torch.log(p_A + 1e-9))
+                ).sum(dim=-1)
+
+                # ---------------------------
+                # TOP-K
+                # ---------------------------
+                topk_vals, topk_ids = torch.topk(
+                    logits_delta, k=topk, dim=-1
+                )
 
                 rows.append({
                     "prompt_id": pid,
                     "layer_index": lid,
                     "mode": mode,
-                    "logits": logits.detach().cpu(),
-                    "delta_norm": delta_norm
+
+                    "tokens": rec_A["target"].cpu(),
+
+                    # ALL LOGITS 
+                    "logits_delta": logits_delta.cpu(),
+                    "logits_A": logits_A.cpu(),
+                    "logits_B": logits_B.cpu(),
+
+                    # ADL core
+                    "delta_logit_max": delta_logit_max.cpu(),
+                    "delta_norm": delta_norm.cpu(),
+
+                    # ADL distribution metrics
+                    "entropy_delta": entropy_delta.cpu(),
+                    "gt_prob_delta": gt_prob_delta.cpu(),
+                    "kl_delta_vs_A": kl_delta_vs_A.cpu(),
+
+                    # hover
+                    "topk_ids": topk_ids.cpu(),
+                    "topk_vals": topk_vals.cpu(),
                 })
 
     return rows
-
 
 
 # ============================================================
@@ -177,3 +242,51 @@ def apply_adl(
 
         del obj_A, obj_B, layers_A, layers_B, records
         gc.collect()
+
+
+def apply_adl_plotter(
+    arch_wrapper,
+    dir_A,
+    dir_B,
+    output_dir,
+    norm_modes=("raw", "model_norm"),
+):
+
+    os.makedirs(output_dir, exist_ok=True)
+
+    files_A = sorted(f for f in os.listdir(dir_A) if f.endswith(".pt"))
+    files_B = sorted(f for f in os.listdir(dir_B) if f.endswith(".pt"))
+
+    assert len(files_A) == len(files_B)
+
+    all_records = []
+
+    for batch_idx, (fa, fb) in enumerate(zip(files_A, files_B)):
+
+        path_A = os.path.join(dir_A, fa)
+        path_B = os.path.join(dir_B, fb)
+
+        obj_A = torch.load(path_A, map_location="cpu")
+        obj_B = torch.load(path_B, map_location="cpu")
+
+        layers_A = _preprocess_rows(obj_A["rows"], norm_modes)
+        layers_B = _preprocess_rows(obj_B["rows"], norm_modes)
+
+        records = _apply_adl(
+            arch_wrapper,
+            layers_A,
+            layers_B,
+            norm_modes=norm_modes,
+        )
+
+        all_records.extend(records)
+
+        torch.save(
+            {"rows": records},
+            os.path.join(output_dir, f"adl_batch_{batch_idx:03d}.pt")
+        )
+
+        del obj_A, obj_B, layers_A, layers_B, records
+        gc.collect()
+
+    return {"rows": all_records}
