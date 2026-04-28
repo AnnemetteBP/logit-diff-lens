@@ -1,0 +1,16 @@
+torch
+transformers
+accelerate
+bitsandbytes
+peft
+scipy
+pandas
+numpy
+matplotlib
+seaborn
+colorcet
+plotly
+kaleido
+tqdm
+ipywidgets
+python-dotenv
