@@ -190,48 +190,87 @@ def _get_layer_outputs(
         - attention_output[L]: attention output from layer L
         - mlp_output[L]: MLP output from layer L
     """
-    if wrapper.model is None:
-        acts, _ = wrapper.forward_pass(input_ids=input_ids, attention_mask=attention_mask, collect_attn=False)
-        results = {
-            "residual_stream": {},
-            "attention_output": {},
-            "mlp_output": {},
-        }
-        block_entries = sorted(
-            (
-                entry["idx"],
-                name,
-            )
-            for name, entry in wrapper.layer_registry.items()
-            if entry["type"] == "block" and name in acts
-        )
-        for layer_idx, name in block_entries:
-            results["residual_stream"][int(layer_idx)] = acts[name][0, -1, :].detach().clone()
-            block = wrapper.blocks[int(layer_idx)]
-            attn_module = _resolve_block_component_module(block, "attention")
-            mlp_module = _resolve_block_component_module(block, "mlp")
-            if attn_module is not None:
-                results["attention_output"][int(layer_idx)] = attn_module(acts["embedding"])[0, -1, :].detach().clone()
-            if mlp_module is not None:
-                results["mlp_output"][int(layer_idx)] = mlp_module(acts["embedding"])[0, -1, :].detach().clone()
-        return results
-
-    outputs = wrapper.model(
-        input_ids=input_ids,
-        attention_mask=attention_mask,
-        output_hidden_states=True,
-        return_dict=True,
-    )
-    hidden_states = outputs.hidden_states
     results = {
         "residual_stream": {},
         "attention_output": {},
         "mlp_output": {},
     }
-    num_layers = len(hidden_states) - 1
-    for layer_idx in range(num_layers):
-        hidden = hidden_states[layer_idx + 1]
-        results["residual_stream"][layer_idx] = hidden[0, -1, :].clone()
+    hook_buffers: Dict[str, Dict[int, torch.Tensor]] = {
+        "attention_output": {},
+        "mlp_output": {},
+    }
+    hook_handles: List[Any] = []
+
+    def _save_component_hook(component_name: str, layer_idx: int):
+        def fn(module, inp, out):
+            tensor = wrapper._extract_tensor(out)
+            if tensor is None:
+                return out
+            hook_buffers[component_name][layer_idx] = tensor.detach().clone()
+            return out
+        return fn
+
+    for layer_idx, block in enumerate(wrapper.blocks):
+        attn_module = _resolve_block_component_module(block, "attention")
+        mlp_module = _resolve_block_component_module(block, "mlp")
+        if attn_module is None:
+            raise ValueError(f"Could not resolve attention module for layer {layer_idx}")
+        if mlp_module is None:
+            raise ValueError(f"Could not resolve MLP module for layer {layer_idx}")
+        hook_handles.append(
+            attn_module.register_forward_hook(_save_component_hook("attention_output", layer_idx))
+        )
+        hook_handles.append(
+            mlp_module.register_forward_hook(_save_component_hook("mlp_output", layer_idx))
+        )
+
+    try:
+        if wrapper.model is None:
+            acts, _ = wrapper.forward_pass(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                collect_attn=False,
+            )
+            block_entries = sorted(
+                (
+                    entry["idx"],
+                    name,
+                )
+                for name, entry in wrapper.layer_registry.items()
+                if entry["type"] == "block" and name in acts
+            )
+            for layer_idx, name in block_entries:
+                results["residual_stream"][int(layer_idx)] = acts[name][0, -1, :].detach().clone()
+        else:
+            outputs = wrapper.model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                output_hidden_states=True,
+                return_dict=True,
+                use_cache=False,
+            )
+            hidden_states = outputs.hidden_states
+            num_layers = len(hidden_states) - 1
+            for layer_idx in range(num_layers):
+                hidden = hidden_states[layer_idx + 1]
+                results["residual_stream"][layer_idx] = hidden[0, -1, :].clone()
+    finally:
+        for hook in hook_handles:
+            try:
+                hook.remove()
+            except Exception:
+                pass
+
+    for layer_idx in range(len(wrapper.blocks)):
+        attn_output = hook_buffers["attention_output"].get(layer_idx)
+        mlp_output = hook_buffers["mlp_output"].get(layer_idx)
+        if attn_output is None:
+            raise ValueError(f"Missing real attention output for layer {layer_idx}")
+        if mlp_output is None:
+            raise ValueError(f"Missing real MLP output for layer {layer_idx}")
+        results["attention_output"][layer_idx] = attn_output[0, -1, :].detach().clone()
+        results["mlp_output"][layer_idx] = mlp_output[0, -1, :].detach().clone()
+
     return results
 
 
@@ -367,18 +406,9 @@ def _compute_attention_contribution(
         # Current residual (before adding this layer)
         residual_current = residual.clone()
         
-        # Get attention output for this layer (if available)
-        # Note: This is a simplification - actual attention output would need
-        # to be captured from the forward pass
         attn_output = layer_outputs.get("attention_output", {}).get(layer_idx)
-        
         if attn_output is None:
-            # If attention output not available, estimate from residual difference
-            # This is an approximation
-            if layer_idx > 0:
-                attn_output = layer_outputs["residual_stream"][layer_idx] - layer_outputs["residual_stream"][layer_idx - 1]
-            else:
-                attn_output = torch.zeros_like(residual_current)
+            raise ValueError(f"Missing real attention output for layer {layer_idx}")
         
         # Compute logits without attention
         h_norm_no_attn = normalize_activations(
@@ -468,16 +498,9 @@ def _compute_mlp_contribution(
         # Current residual (before adding this layer)
         residual_current = residual.clone()
         
-        # Get MLP output for this layer (if available)
         mlp_output = layer_outputs.get("mlp_output", {}).get(layer_idx)
-        
         if mlp_output is None:
-            # If MLP output not available, estimate from residual difference
-            # This is an approximation
-            if layer_idx > 0:
-                mlp_output = layer_outputs["residual_stream"][layer_idx] - layer_outputs["residual_stream"][layer_idx - 1]
-            else:
-                mlp_output = torch.zeros_like(residual_current)
+            raise ValueError(f"Missing real MLP output for layer {layer_idx}")
         
         # Compute logits without MLP
         h_norm_no_mlp = normalize_activations(
