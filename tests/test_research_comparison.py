@@ -607,3 +607,120 @@ def test_incremental_blind_token_judging_filters_to_late_layers_and_uses_prompt_
     assert all("Original prompt:\nprompt late filter" in prompt for prompt in seen_prompts)
     assert all("Layer index:\n2" in prompt or "Layer index:\n4" in prompt for prompt in seen_prompts)
     assert not any("Layer index:\n0" in prompt for prompt in seen_prompts)
+
+
+def test_compute_conditioned_output_amplification_tracks_a_b_c_and_amplification(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_analyze(*, base_model, finetuned_model, tokenizer, text, max_seq_len, add_special_tokens, prompt_format):
+        del base_model, finetuned_model, tokenizer, max_seq_len, add_special_tokens, prompt_format
+        table = {
+            "prompt": {
+                "kl_per_layer": [0.1, 0.2],
+                "l2_per_layer": [1.0, 2.0],
+                "delta_norms_per_layer": [0.5, 0.6],
+                "mds": 0.1,
+                "mean_kl": 0.15,
+                "mean_l2": 1.5,
+                "mean_delta_norm": 0.55,
+            },
+            "prompt base": {
+                "kl_per_layer": [0.2, 0.4],
+                "l2_per_layer": [2.0, 4.0],
+                "delta_norms_per_layer": [0.7, 0.9],
+                "mds": 0.4,
+                "mean_kl": 0.3,
+                "mean_l2": 3.0,
+                "mean_delta_norm": 0.8,
+            },
+            "prompt ft": {
+                "kl_per_layer": [0.3, 0.6],
+                "l2_per_layer": [3.0, 6.0],
+                "delta_norms_per_layer": [0.8, 1.2],
+                "mds": 0.8,
+                "mean_kl": 0.45,
+                "mean_l2": 4.5,
+                "mean_delta_norm": 1.0,
+            },
+        }
+        result = dict(table[text])
+        result["condition_text"] = text
+        result["rendered_text"] = text
+        result["layer_indices"] = [0, 1]
+        return result
+
+    monkeypatch.setattr(rc, "_analyze_conditioned_text", fake_analyze)
+
+    tokenizer = _DummyTokenizer(vocab_size=4)
+    base_model = _DummyModel(vocab_size=4, num_hidden_layers=2, model_type="dummy", name="base")
+    finetuned_model = _DummyModel(vocab_size=4, num_hidden_layers=2, model_type="dummy", name="finetuned")
+
+    result = rc.compute_conditioned_output_amplification(
+        base_model=base_model,
+        finetuned_model=finetuned_model,
+        tokenizer=tokenizer,
+        examples=[
+            {
+                "id": 1,
+                "prompt": "prompt",
+                "base_output": "base",
+                "ft_output": "ft",
+                "harmful_label": 1,
+            }
+        ],
+        prompt_format="plain",
+        condition_separator=" ",
+        seed=7,
+        generation_metadata={"temperature": 0, "max_new_tokens": 50},
+    )
+
+    assert result["mds"]["A"] == [0.1]
+    assert result["mds"]["B"] == [0.4]
+    assert result["mds"]["C"] == [0.8]
+    assert result["amplification"]["base"] == [0.30000000000000004]
+    assert result["amplification"]["ft"] == [0.7000000000000001]
+    assert result["delta_norms"]["change_B"] == [[0.19999999999999996, 0.30000000000000004]]
+    assert result["delta_norms"]["change_C"] == [[0.30000000000000004, 0.6]]
+    assert result["summary"]["fraction_mds_C_gt_B_gt_A"] == 1.0
+    assert result["summary"]["corr_mds_C_vs_harmful_label"] is None
+    assert result["run_config"]["generation_metadata"] == {"temperature": 0, "max_new_tokens": 50}
+
+
+def test_compute_conditioned_output_amplification_empty_outputs_reduce_to_a(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    seen_texts = []
+
+    def fake_analyze(*, base_model, finetuned_model, tokenizer, text, max_seq_len, add_special_tokens, prompt_format):
+        del base_model, finetuned_model, tokenizer, max_seq_len, add_special_tokens, prompt_format
+        seen_texts.append(text)
+        return {
+            "condition_text": text,
+            "rendered_text": text,
+            "layer_indices": [0],
+            "kl_per_layer": [0.0],
+            "l2_per_layer": [0.0],
+            "delta_norms_per_layer": [0.0],
+            "mds": 0.0,
+            "mean_kl": 0.0,
+            "mean_l2": 0.0,
+            "mean_delta_norm": 0.0,
+        }
+
+    monkeypatch.setattr(rc, "_analyze_conditioned_text", fake_analyze)
+
+    tokenizer = _DummyTokenizer(vocab_size=4)
+    base_model = _DummyModel(vocab_size=4, num_hidden_layers=1, model_type="dummy", name="base")
+    finetuned_model = _DummyModel(vocab_size=4, num_hidden_layers=1, model_type="dummy", name="finetuned")
+
+    result = rc.compute_conditioned_output_amplification(
+        base_model=base_model,
+        finetuned_model=finetuned_model,
+        tokenizer=tokenizer,
+        examples=[{"prompt": "prompt", "base_output": "", "ft_output": ""}],
+    )
+
+    assert seen_texts == ["prompt", "prompt", "prompt"]
+    assert result["examples"][0]["conditions"]["A"] == "prompt"
+    assert result["examples"][0]["conditions"]["B"] == "prompt"
+    assert result["examples"][0]["conditions"]["C"] == "prompt"

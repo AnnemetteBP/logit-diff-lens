@@ -5,6 +5,17 @@ from .core import (
     run_logitdiff_repeated,
     save_model_organisms_logitdiff,
 )
+from .cross_model_eval import (
+    CrossModelEvalConfig,
+    run_cross_model_eval,
+)
+from .logit_prism import (
+    collect_teacher_forced_activations,
+    collect_teacher_forced_activations_dataset_pair_incremental,
+    LogitPrismConfig,
+    run_logit_prism,
+    run_logit_prism_batch,
+)
 from .agent_tools import (
     build_logitdiff_overview,
     flatten_logitdiff_records,
@@ -74,4 +85,6 @@ __all__ = [
     "make_quantization_config",
     "make_misalignment_config",
     "make_broad_misalignment_config",
+    "collect_teacher_forced_activations",
+    "collect_teacher_forced_activations_dataset_pair_incremental",
 ]

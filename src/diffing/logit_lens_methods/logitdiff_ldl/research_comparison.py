@@ -65,6 +65,18 @@ class FullEvaluationExample:
     type: str
 
 
+@dataclass(frozen=True)
+class ConditionedOutputExample:
+    prompt: str
+    base_output: str
+    ft_output: str
+    harmful_label: float | None = None
+    id: int | None = None
+    category: str | None = None
+    type: str | None = None
+    metadata: Dict[str, Any] | None = None
+
+
 def _validate_finite_tensor(name: str, tensor: torch.Tensor) -> None:
     if not torch.isfinite(tensor).all():
         raise ValueError(f"{name} contains NaN or inf values")
@@ -310,6 +322,163 @@ def get_layer_logits(
         logits_per_layer[layer_idx] = logits
 
     return logits_per_layer
+
+
+@torch.no_grad()
+def get_layer_hidden_and_logits(
+    model: PreTrainedModel,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None = None,
+) -> tuple[Dict[int, torch.Tensor], Dict[int, torch.Tensor]]:
+    """Collect last-token hidden vectors and projected logits for every layer."""
+    if attention_mask is None:
+        attention_mask = torch.ones_like(input_ids)
+
+    _, hidden_states = _forward_hidden_states(
+        model=model,
+        input_ids=input_ids,
+        attention_mask=attention_mask,
+    )
+    last_token_idx = _last_token_index(attention_mask)
+    hidden_per_layer: Dict[int, torch.Tensor] = {}
+    logits_per_layer: Dict[int, torch.Tensor] = {}
+
+    for layer_idx, hidden_state in enumerate(hidden_states):
+        last_hidden_state = hidden_state[:, last_token_idx : last_token_idx + 1, :]
+        hidden_vector = last_hidden_state[0, 0].detach().to(dtype=torch.float32, device="cpu")
+        logits = _project_hidden_state_to_logits(model, last_hidden_state)[0, 0]
+        _validate_finite_tensor(f"last hidden vector at layer {layer_idx}", hidden_vector)
+        hidden_per_layer[layer_idx] = hidden_vector
+        logits_per_layer[layer_idx] = logits
+
+    return hidden_per_layer, logits_per_layer
+
+
+def _join_prompt_and_output(
+    prompt: str,
+    output_text: str,
+    *,
+    separator: str = " ",
+) -> str:
+    prompt_text = str(prompt)
+    continuation = str(output_text)
+    if not continuation.strip():
+        return prompt_text
+    if not prompt_text.strip():
+        return continuation
+    return f"{prompt_text}{separator}{continuation}"
+
+
+def _safe_optional_correlation(
+    x: Sequence[float],
+    y: Sequence[float | int | None],
+) -> float | None:
+    filtered_pairs = [
+        (float(xi), float(yi))
+        for xi, yi in zip(x, y)
+        if yi is not None
+    ]
+    if len(filtered_pairs) < 2:
+        return None
+    xs = [pair[0] for pair in filtered_pairs]
+    ys = [pair[1] for pair in filtered_pairs]
+    try:
+        return _pearson_correlation(xs, ys, name="conditioned_output_correlation")
+    except ValueError:
+        return None
+
+
+def _compute_l2_per_layer(
+    base_logits: Dict[int, torch.Tensor],
+    finetuned_logits: Dict[int, torch.Tensor],
+    *,
+    layer_indices: Sequence[int],
+) -> List[float]:
+    l2_values: List[float] = []
+    for layer_idx in layer_indices:
+        diff = finetuned_logits[layer_idx].to(torch.float32) - base_logits[layer_idx].to(torch.float32)
+        _validate_finite_tensor(f"logit diff at layer {layer_idx}", diff)
+        l2_values.append(float(torch.norm(diff, p=2).item()))
+    return l2_values
+
+
+def _compute_delta_norms_per_layer(
+    base_hidden: Dict[int, torch.Tensor],
+    finetuned_hidden: Dict[int, torch.Tensor],
+    *,
+    layer_indices: Sequence[int],
+) -> List[float]:
+    norms: List[float] = []
+    for layer_idx in layer_indices:
+        delta = finetuned_hidden[layer_idx].to(torch.float32) - base_hidden[layer_idx].to(torch.float32)
+        _validate_finite_tensor(f"hidden delta at layer {layer_idx}", delta)
+        norms.append(float(torch.norm(delta, p=2).item()))
+    return norms
+
+
+def _analyze_conditioned_text(
+    *,
+    base_model: PreTrainedModel,
+    finetuned_model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
+    text: str,
+    max_seq_len: int | None,
+    add_special_tokens: bool,
+    prompt_format: PromptFormat,
+) -> Dict[str, Any]:
+    rendered_text = _render_prompt_text(
+        tokenizer=tokenizer,
+        prompt=text,
+        prompt_format=prompt_format,
+    )
+    tokenized = tokenize_prompt_once(
+        tokenizer=tokenizer,
+        prompt=rendered_text,
+        max_seq_len=max_seq_len,
+        add_special_tokens=add_special_tokens,
+    )
+    base_hidden, base_logits = get_layer_hidden_and_logits(
+        model=base_model,
+        input_ids=tokenized.input_ids,
+        attention_mask=tokenized.attention_mask,
+    )
+    ft_hidden, ft_logits = get_layer_hidden_and_logits(
+        model=finetuned_model,
+        input_ids=tokenized.input_ids,
+        attention_mask=tokenized.attention_mask,
+    )
+
+    layer_indices = sorted(base_hidden.keys())
+    if layer_indices != sorted(ft_hidden.keys()):
+        raise ValueError(
+            "Layer indexing mismatch between models for conditioned text: "
+            f"base={sorted(base_hidden.keys())}, finetuned={sorted(ft_hidden.keys())}"
+        )
+    if layer_indices != sorted(base_logits.keys()) or layer_indices != sorted(ft_logits.keys()):
+        raise ValueError("Hidden-state and logit layer indices do not match for conditioned analysis")
+
+    probs_base = _logits_to_probs(base_logits)
+    probs_ft = _logits_to_probs(ft_logits)
+    kl_per_layer = [compute_kl(probs_base[layer_idx], probs_ft[layer_idx]) for layer_idx in layer_indices]
+    l2_per_layer = _compute_l2_per_layer(base_logits, ft_logits, layer_indices=layer_indices)
+    delta_norms_per_layer = _compute_delta_norms_per_layer(
+        base_hidden,
+        finetuned_hidden=ft_hidden,
+        layer_indices=layer_indices,
+    )
+
+    return {
+        "condition_text": text,
+        "rendered_text": rendered_text,
+        "layer_indices": list(layer_indices),
+        "kl_per_layer": kl_per_layer,
+        "l2_per_layer": l2_per_layer,
+        "delta_norms_per_layer": delta_norms_per_layer,
+        "mds": compute_mds(kl_per_layer),
+        "mean_kl": _mean_scalar(kl_per_layer, name="condition_kl_per_layer"),
+        "mean_l2": _mean_scalar(l2_per_layer, name="condition_l2_per_layer"),
+        "mean_delta_norm": _mean_scalar(delta_norms_per_layer, name="condition_delta_norms_per_layer"),
+    }
 
 
 def _collect_wrapper_prompt_layer_logits(
@@ -605,6 +774,36 @@ def _coerce_full_evaluation_example(
         prompt=str(example["prompt"]),
         category=str(example["category"]),
         type=str(example["type"]),
+    )
+
+
+def _coerce_conditioned_output_example(
+    example: ConditionedOutputExample | Dict[str, Any]
+) -> ConditionedOutputExample:
+    if isinstance(example, ConditionedOutputExample):
+        return example
+    known_fields = {
+        "prompt",
+        "base_output",
+        "ft_output",
+        "harmful_label",
+        "id",
+        "category",
+        "type",
+        "metadata",
+    }
+    metadata = dict(example.get("metadata", {})) if isinstance(example.get("metadata"), dict) else {}
+    metadata.update({k: v for k, v in example.items() if k not in known_fields})
+    harmful_label = example.get("harmful_label")
+    return ConditionedOutputExample(
+        prompt=str(example["prompt"]),
+        base_output=str(example["base_output"]),
+        ft_output=str(example["ft_output"]),
+        harmful_label=None if harmful_label is None else float(harmful_label),
+        id=None if example.get("id") is None else int(example["id"]),
+        category=None if example.get("category") is None else str(example["category"]),
+        type=None if example.get("type") is None else str(example["type"]),
+        metadata=metadata or None,
     )
 
 
@@ -1628,6 +1827,217 @@ def analyze_prompt_truth_flip(
         "prompt_mds": float(prompt_metrics["mds"]),
         "kl_per_layer": list(prompt_metrics["kl_per_layer"]),
         "jaccard_per_layer": list(prompt_metrics["jaccard_per_layer"]),
+    }
+
+
+def compute_conditioned_output_amplification(
+    base_model: PreTrainedModel,
+    finetuned_model: PreTrainedModel,
+    tokenizer: PreTrainedTokenizerBase,
+    examples: Sequence[ConditionedOutputExample | Dict[str, Any]],
+    *,
+    max_seq_len: int | None = None,
+    add_special_tokens: bool = True,
+    prompt_format: PromptFormat = "plain",
+    condition_separator: str = " ",
+    seed: int = 42,
+    generation_metadata: Dict[str, Any] | None = None,
+) -> Dict[str, Any]:
+    """Compare divergence after conditioning on the models' own prior outputs."""
+    _validate_model_pair(base_model, finetuned_model, tokenizer)
+    if not examples:
+        raise ValueError("examples must be non-empty")
+
+    torch.manual_seed(int(seed))
+    coerced_examples = [_coerce_conditioned_output_example(example) for example in examples]
+
+    example_rows: List[Dict[str, Any]] = []
+    mds_A: List[float] = []
+    mds_B: List[float] = []
+    mds_C: List[float] = []
+    amplification_base: List[float] = []
+    amplification_ft: List[float] = []
+    harmful_labels: List[float | None] = []
+    ordering_flags: List[bool] = []
+
+    delta_norms_A: List[List[float]] = []
+    delta_norms_B: List[List[float]] = []
+    delta_norms_C: List[List[float]] = []
+    delta_norm_change_B: List[List[float]] = []
+    delta_norm_change_C: List[List[float]] = []
+
+    logit_shifts_A: List[Dict[str, Any]] = []
+    logit_shifts_B: List[Dict[str, Any]] = []
+    logit_shifts_C: List[Dict[str, Any]] = []
+
+    for example in coerced_examples:
+        condition_A = str(example.prompt)
+        condition_B = _join_prompt_and_output(
+            example.prompt,
+            example.base_output,
+            separator=condition_separator,
+        )
+        condition_C = _join_prompt_and_output(
+            example.prompt,
+            example.ft_output,
+            separator=condition_separator,
+        )
+
+        metrics_A = _analyze_conditioned_text(
+            base_model=base_model,
+            finetuned_model=finetuned_model,
+            tokenizer=tokenizer,
+            text=condition_A,
+            max_seq_len=max_seq_len,
+            add_special_tokens=add_special_tokens,
+            prompt_format=prompt_format,
+        )
+        metrics_B = _analyze_conditioned_text(
+            base_model=base_model,
+            finetuned_model=finetuned_model,
+            tokenizer=tokenizer,
+            text=condition_B,
+            max_seq_len=max_seq_len,
+            add_special_tokens=add_special_tokens,
+            prompt_format=prompt_format,
+        )
+        metrics_C = _analyze_conditioned_text(
+            base_model=base_model,
+            finetuned_model=finetuned_model,
+            tokenizer=tokenizer,
+            text=condition_C,
+            max_seq_len=max_seq_len,
+            add_special_tokens=add_special_tokens,
+            prompt_format=prompt_format,
+        )
+
+        delta_change_B = [
+            float(delta_b - delta_a)
+            for delta_a, delta_b in zip(metrics_A["delta_norms_per_layer"], metrics_B["delta_norms_per_layer"])
+        ]
+        delta_change_C = [
+            float(delta_c - delta_a)
+            for delta_a, delta_c in zip(metrics_A["delta_norms_per_layer"], metrics_C["delta_norms_per_layer"])
+        ]
+        amp_base = float(metrics_B["mds"] - metrics_A["mds"])
+        amp_ft = float(metrics_C["mds"] - metrics_A["mds"])
+
+        logit_shift_A = {
+            "kl_per_layer": list(metrics_A["kl_per_layer"]),
+            "l2_per_layer": list(metrics_A["l2_per_layer"]),
+            "mean_kl": float(metrics_A["mean_kl"]),
+            "mean_l2": float(metrics_A["mean_l2"]),
+        }
+        logit_shift_B = {
+            "kl_per_layer": list(metrics_B["kl_per_layer"]),
+            "l2_per_layer": list(metrics_B["l2_per_layer"]),
+            "mean_kl": float(metrics_B["mean_kl"]),
+            "mean_l2": float(metrics_B["mean_l2"]),
+        }
+        logit_shift_C = {
+            "kl_per_layer": list(metrics_C["kl_per_layer"]),
+            "l2_per_layer": list(metrics_C["l2_per_layer"]),
+            "mean_kl": float(metrics_C["mean_kl"]),
+            "mean_l2": float(metrics_C["mean_l2"]),
+        }
+
+        example_rows.append(
+            {
+                "id": example.id,
+                "prompt": example.prompt,
+                "base_output": example.base_output,
+                "ft_output": example.ft_output,
+                "category": example.category,
+                "type": example.type,
+                "harmful_label": example.harmful_label,
+                "metadata": example.metadata,
+                "conditions": {
+                    "A": condition_A,
+                    "B": condition_B,
+                    "C": condition_C,
+                },
+                "mds": {
+                    "A": float(metrics_A["mds"]),
+                    "B": float(metrics_B["mds"]),
+                    "C": float(metrics_C["mds"]),
+                },
+                "amplification": {
+                    "base": amp_base,
+                    "ft": amp_ft,
+                },
+                "delta_norms": {
+                    "A": list(metrics_A["delta_norms_per_layer"]),
+                    "B": list(metrics_B["delta_norms_per_layer"]),
+                    "C": list(metrics_C["delta_norms_per_layer"]),
+                    "change_B": delta_change_B,
+                    "change_C": delta_change_C,
+                },
+                "logit_shifts": {
+                    "A": logit_shift_A,
+                    "B": logit_shift_B,
+                    "C": logit_shift_C,
+                },
+            }
+        )
+
+        mds_A.append(float(metrics_A["mds"]))
+        mds_B.append(float(metrics_B["mds"]))
+        mds_C.append(float(metrics_C["mds"]))
+        amplification_base.append(amp_base)
+        amplification_ft.append(amp_ft)
+        harmful_labels.append(example.harmful_label)
+        ordering_flags.append(bool(metrics_C["mds"] > metrics_B["mds"] > metrics_A["mds"]))
+
+        delta_norms_A.append(list(metrics_A["delta_norms_per_layer"]))
+        delta_norms_B.append(list(metrics_B["delta_norms_per_layer"]))
+        delta_norms_C.append(list(metrics_C["delta_norms_per_layer"]))
+        delta_norm_change_B.append(delta_change_B)
+        delta_norm_change_C.append(delta_change_C)
+        logit_shifts_A.append(logit_shift_A)
+        logit_shifts_B.append(logit_shift_B)
+        logit_shifts_C.append(logit_shift_C)
+
+    return {
+        "run_config": {
+            "prompt_format": prompt_format,
+            "condition_separator": condition_separator,
+            "max_seq_len": max_seq_len,
+            "add_special_tokens": bool(add_special_tokens),
+            "seed": int(seed),
+            "generation_metadata": generation_metadata,
+            "num_examples": len(coerced_examples),
+        },
+        "examples": example_rows,
+        "mds": {
+            "A": mds_A,
+            "B": mds_B,
+            "C": mds_C,
+        },
+        "amplification": {
+            "base": amplification_base,
+            "ft": amplification_ft,
+        },
+        "delta_norms": {
+            "A": delta_norms_A,
+            "B": delta_norms_B,
+            "C": delta_norms_C,
+            "change_B": delta_norm_change_B,
+            "change_C": delta_norm_change_C,
+        },
+        "logit_shifts": {
+            "A": logit_shifts_A,
+            "B": logit_shifts_B,
+            "C": logit_shifts_C,
+        },
+        "summary": {
+            "mean_mds_A": _mean_scalar(mds_A, name="mds_A"),
+            "mean_mds_B": _mean_scalar(mds_B, name="mds_B"),
+            "mean_mds_C": _mean_scalar(mds_C, name="mds_C"),
+            "mean_amplification_base": _mean_scalar(amplification_base, name="amplification_base"),
+            "mean_amplification_ft": _mean_scalar(amplification_ft, name="amplification_ft"),
+            "fraction_mds_C_gt_B_gt_A": float(sum(ordering_flags) / len(ordering_flags)),
+            "corr_mds_C_vs_harmful_label": _safe_optional_correlation(mds_C, harmful_labels),
+        },
     }
 
 
