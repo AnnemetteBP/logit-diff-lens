@@ -3,8 +3,10 @@ from .wrapper_utils import (
     module_is_quantized,
     detect_architecture,
     resolve_backbone,
+    resolve_block_component_module,
     find_final_norm,
     build_layer_registry,
+    build_component_registry,
     assert_isfinite,
     dbg,
     dbg_tensor,
@@ -14,8 +16,10 @@ from .wrapper_utils import (
     lmhead_project,
     as_tensor 
 )
+from .generation_utils import generate_with_model
 
-from .lens_wrappers.generation_lens_wrapper import GenerationLensWrapper
+from .lens_wrappers.custom_generation_lens_wrapper import CustomGenerationLensWrapper
+from .lens_wrappers.generation_lens_wrapper import GenerateLensWrapper
 from .lens_wrappers.logit_lens_wrapper import LogitLensWrapper
 from .lens_wrappers.patching_lens_wrapper import PatchingLensWrapper
 
@@ -25,8 +29,10 @@ __all__ = [
     "module_is_quantized",
     "detect_architecture",
     "resolve_backbone",
+    "resolve_block_component_module",
     "find_final_norm",
     "build_layer_registry",
+    "build_component_registry",
     "assert_isfinite",
     "dbg",
     "dbg_tensor",
@@ -35,7 +41,9 @@ __all__ = [
     "normalize_activations",
     "lmhead_project",
     "as_tensor",
-    "GenerationLensWrapper",
+    "generate_with_model",
+    "CustomGenerationLensWrapper",
+    "GenerateLensWrapper",
     "LogitLensWrapper",
     "PatchingLensWrapper"
 ]

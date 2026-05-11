@@ -85,6 +85,33 @@ def build_layer_registry(
     return reg
 
 
+def resolve_block_component_module(block: Any, component: str) -> Any | None:
+    if component == "attention":
+        candidate_names = ("self_attn", "attention", "attn", "self_attention", "mixer")
+    elif component == "mlp":
+        candidate_names = ("mlp", "feed_forward", "ffn", "ff")
+    else:
+        raise ValueError(f"Unsupported component: {component}")
+
+    for name in candidate_names:
+        module = getattr(block, name, None)
+        if module is not None:
+            return module
+    return None
+
+
+def build_component_registry(blocks: List[Any]) -> OrderedDict:
+    reg = OrderedDict()
+    for i, block in enumerate(blocks):
+        attn_module = resolve_block_component_module(block, "attention")
+        mlp_module = resolve_block_component_module(block, "mlp")
+        if attn_module is not None:
+            reg[f"attention_{i:02d}"] = {"module": attn_module, "type": "attention", "idx": i}
+        if mlp_module is not None:
+            reg[f"mlp_{i:02d}"] = {"module": mlp_module, "type": "mlp", "idx": i}
+    return reg
+
+
 # ================================================================
 #  DEBUGGING
 # ================================================================

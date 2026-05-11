@@ -24,7 +24,10 @@ dependencies = [
   "kaleido",
   "tqdm",
   "ipywidgets",
-  "python-dotenv"
+  "python-dotenv",
+  "loguru",
+  "nnsight",
+  "notebook"
 ]
 
 [tool.setuptools.packages.find]

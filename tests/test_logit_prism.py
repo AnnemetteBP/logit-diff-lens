@@ -7,8 +7,7 @@ from types import SimpleNamespace
 
 import torch
 
-from diffing.logit_lens_methods.logitdiff.logit_prism import (
-    collect_teacher_forced_activations,
+from diffing.logit_lens_methods.logit_prisms.logit_prism import (
     collect_teacher_forced_activations_dataset_pair_incremental,
     _get_layer_outputs,
     extract_logit_prism_dataset_from_saved_run,
@@ -127,6 +126,8 @@ class _DummyCollectWrapper(BaseLensWrapper):
         self.model_dtype = torch.float32
         self.stable = True
         self.blocks = [self.model.block]
+        self.final_norm = None
+        self.lm_head = self.model.lm_head
 
     def attach_hooks(self) -> None:
         return None
@@ -165,31 +166,6 @@ def test_get_layer_outputs_captures_attention_and_mlp_components() -> None:
     assert torch.allclose(outputs["residual_stream"][0], expected_last_token)
     assert torch.allclose(outputs["attention_output"][0], expected_attn)
     assert torch.allclose(outputs["mlp_output"][0], expected_mlp)
-
-
-def test_collect_teacher_forced_activations_stores_full_sequence_tensors(monkeypatch) -> None:
-    wrapper = _DummyCollectWrapper()
-    monkeypatch.setattr(
-        "diffing.logit_lens_methods.logitdiff.logit_prism._format_generation_prompt",
-        lambda wrapper, prompt, **kwargs: prompt,
-    )
-
-    from diffing.logit_lens_methods.logitdiff.logit_prism import LogitPrismConfig
-
-    result = collect_teacher_forced_activations(
-        wrapper,
-        LogitPrismConfig(prompt="demo"),
-    )
-
-    assert len(result["hidden_states"]) == 2
-    assert tuple(result["embedding"].shape) == (1, 3, 3)
-    assert tuple(result["hidden_states"][0].shape) == (1, 3, 3)
-    assert tuple(result["hidden_states"][1].shape) == (1, 3, 3)
-    assert tuple(result["logits"].shape) == (1, 3, 5)
-    assert len(result["attention_outputs"]) == 1
-    assert len(result["mlp_outputs"]) == 1
-    assert tuple(result["attention_outputs"][0].shape) == (1, 3, 3)
-    assert tuple(result["mlp_outputs"][0].shape) == (1, 3, 3)
 
 
 def test_extract_logit_prism_dataset_from_saved_run_writes_prompt_and_model_rows(tmp_path: Path) -> None:
@@ -274,7 +250,7 @@ def test_run_logit_prism_dataset_pair_incremental_resumes(tmp_path: Path, monkey
         }
 
     monkeypatch.setattr(
-        "diffing.logit_lens_methods.logitdiff.logit_prism.run_logit_prism",
+        "diffing.logit_lens_methods.logit_prisms.logit_prism.run_logit_prism",
         fake_run_logit_prism,
     )
 
@@ -317,7 +293,7 @@ def test_collect_teacher_forced_activations_dataset_pair_incremental_saves_reusa
             handle.write(json.dumps(row) + "\n")
 
     monkeypatch.setattr(
-        "diffing.logit_lens_methods.logitdiff.logit_prism._format_generation_prompt",
+        "diffing.logit_lens_methods.logit_prisms.logit_prism._format_generation_prompt",
         lambda wrapper, prompt, **kwargs: prompt,
     )
 
@@ -354,7 +330,7 @@ def test_run_logit_prism_omits_full_logits_by_default(monkeypatch) -> None:
     wrapper = _DummyWrapper()
 
     monkeypatch.setattr(
-        "diffing.logit_lens_methods.logitdiff.logit_prism._get_layer_outputs",
+        "diffing.logit_lens_methods.logit_prisms.logit_prism._get_layer_outputs",
         lambda wrapper, input_ids, attention_mask=None: {
             "residual_stream": {0: torch.tensor([1.0, 0.0, 0.0], dtype=torch.float32)},
             "attention_output": {0: torch.tensor([0.5, 0.0, 0.0], dtype=torch.float32)},
@@ -362,7 +338,7 @@ def test_run_logit_prism_omits_full_logits_by_default(monkeypatch) -> None:
         },
     )
     monkeypatch.setattr(
-        "diffing.logit_lens_methods.logitdiff.logit_prism._format_generation_prompt",
+        "diffing.logit_lens_methods.logit_prisms.logit_prism._format_generation_prompt",
         lambda wrapper, prompt, **kwargs: prompt,
     )
     monkeypatch.setattr(
@@ -374,7 +350,7 @@ def test_run_logit_prism_omits_full_logits_by_default(monkeypatch) -> None:
         },
     )
 
-    from diffing.logit_lens_methods.logitdiff.logit_prism import LogitPrismConfig, run_logit_prism
+    from diffing.logit_lens_methods.logit_prisms.logit_prism import LogitPrismConfig, run_logit_prism
 
     result = run_logit_prism(
         wrapper,

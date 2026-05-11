@@ -700,3 +700,71 @@ Run them with:
 PYTHONPATH=src ./.venv/bin/pytest -q tests/test_research_comparison.py
 PYTHONPATH=src ./.venv/bin/pytest -q tests/test_representation_analysis.py
 ```
+
+PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
+from pathlib import Path
+import importlib.util
+import plotly.io as pio
+
+module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
+spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
+out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
+kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
+html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
+pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
+fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
+pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
+print(html_path)
+print(pdf_path)
+print(out_base.with_suffix('.png'))
+PY
+
+
+
+PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
+from pathlib import Path
+import importlib.util
+import plotly.io as pio
+
+module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
+spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
+out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
+kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
+html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
+pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
+fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
+pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
+print(html_path)
+print(pdf_path)
+print(out_base.with_suffix('.png'))
+PY
+
+PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
+from pathlib import Path
+import importlib.util
+import plotly.io as pio
+
+module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
+spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
+mod = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(mod)
+
+src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
+out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
+kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
+html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
+pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
+fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
+pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
+print(html_path)
+print(pdf_path)
+print(out_base.with_suffix('.png'))
+PY

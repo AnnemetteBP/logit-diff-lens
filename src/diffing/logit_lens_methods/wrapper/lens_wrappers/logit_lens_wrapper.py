@@ -9,7 +9,8 @@ from ..wrapper_utils import(
     detect_architecture,
     resolve_backbone,
     find_final_norm,
-    build_layer_registry
+    build_layer_registry,
+    build_component_registry,
 )
 
 
@@ -58,6 +59,7 @@ class LogitLensWrapper(BaseLensWrapper):
             lm_head=self.lm_head,
             blocks=self.blocks
         )
+        self.component_registry = build_component_registry(self.blocks)
         self.activations = OrderedDict()
         self.hooks = {}
 

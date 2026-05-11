@@ -1,67 +1,59 @@
 from . import logitdiff_adl
-from . import gen
+from .base_collector_scripts import generation
+from . import logitdiff_tf
+from . import logitdiff_gen
+from . import logitdiff_analyses
 from . import logitdiff_ldl
-from . import logitdiff
-
-from .logitdiff import (
-    AgentBudgetConfig,
-    AgentLLMConfig,
-    AskModelConfig,
-    LogitDiffRunConfig,
-    LogitDiffAgent,
-    LogitDiffAgentConfig,
-    build_model_organisms_logitdiff_path,
-    build_logitdiff_overview,
-    make_broad_misalignment_config,
-    run_logitdiff,
-    run_logitdiff_agent,
-    save_agent_messages,
-    save_agent_stats,
-    save_logitdiff_overview,
-    save_model_organisms_logitdiff,
-    make_quantization_config,
-    make_misalignment_config,
+from .base_collector_scripts.teacher_forcing.collect_tf_activations_batched import (
+    TeacherForcingActivationCollectorConfig,
+    collect_activation_dataset_incremental,
+    collect_teacher_forcing_activations,
 )
 
-try:
-    from .logitdiff import (
-        list_available_prompts,
-        plot_logitdiff_jaccard_heatmap,
-        save_logitdiff_heatmap_html,
-        save_logitdiff_heatmap_pdf,
-    )
-except (ModuleNotFoundError, ImportError):
-    plotting = None
-    list_available_prompts = None
-    plot_logitdiff_jaccard_heatmap = None
-    save_logitdiff_heatmap_html = None
-    save_logitdiff_heatmap_pdf = None
+from .logitdiff_gen import (
+    LogitDiffRunConfig,
+    CrossModelEvalConfig,
+    build_model_organisms_logitdiff_path,
+    run_logitdiff,
+    run_logitdiff_repeated,
+    run_cross_model_eval,
+    save_model_organisms_logitdiff,
+    EM_PROMPTS,
+    BROAD_MISALIGNMENT_PROMPTS,
+    FT_MISALIGNMENT_PROMPTS,
+    QUANTIZATION_PROMPTS,
+    make_em_config,
+    make_em_sampling_config,
+    make_broad_misalignment_config,
+    make_misalignment_config,
+    make_quantization_config,
+)
 
 
 __all__ = [
     "logitdiff_adl",
-    "gen",
+    "generation",
+    "logitdiff_tf",
+    "logitdiff_gen",
+    "logitdiff_analyses",
     "logitdiff_ldl",
-    "logitdiff",
-    "AgentLLMConfig",
-    "AgentBudgetConfig",
-    "AskModelConfig",
+    "TeacherForcingActivationCollectorConfig",
+    "collect_teacher_forcing_activations",
+    "collect_activation_dataset_incremental",
     "LogitDiffRunConfig",
-    "LogitDiffAgentConfig",
-    "LogitDiffAgent",
+    "CrossModelEvalConfig",
     "build_model_organisms_logitdiff_path",
-    "build_logitdiff_overview",
     "run_logitdiff",
-    "run_logitdiff_agent",
-    "save_agent_messages",
-    "save_agent_stats",
-    "save_logitdiff_overview",
+    "run_logitdiff_repeated",
+    "run_cross_model_eval",
     "save_model_organisms_logitdiff",
+    "EM_PROMPTS",
+    "BROAD_MISALIGNMENT_PROMPTS",
+    "FT_MISALIGNMENT_PROMPTS",
+    "QUANTIZATION_PROMPTS",
+    "make_em_config",
+    "make_em_sampling_config",
     "make_quantization_config",
     "make_misalignment_config",
     "make_broad_misalignment_config",
-    "list_available_prompts",
-    "plot_logitdiff_jaccard_heatmap",
-    "save_logitdiff_heatmap_html",
-    "save_logitdiff_heatmap_pdf",
 ]
