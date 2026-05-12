@@ -169,18 +169,32 @@ def _build_cell_parts(
     position: Dict[str, Any],
     display_top_tokens: int,
     max_token_chars: int,
+    comparison_k: int | None = None,
 ) -> Dict[str, List[str]]:
+    topk_payload = None
+    if comparison_k is not None:
+        topk_payload = position.get("topk_predictions", {}).get(str(comparison_k))
+
+    if topk_payload is not None:
+        shared_source = topk_payload.get("shared_tokens", [])
+        base_only_source = topk_payload.get("base_only_tokens", [])
+        ft_only_source = topk_payload.get("finetuned_only_tokens", [])
+    else:
+        shared_source = position.get("intersection", [])
+        base_only_source = position.get("only_base", [])
+        ft_only_source = position.get("only_finetuned", [])
+
     shared = [
         _truncate(_clean_token(token), max_token_chars)
-        for token in position.get("intersection", [])[:display_top_tokens]
+        for token in shared_source[:display_top_tokens]
     ]
     only_base = [
         _truncate(_clean_token(token), max_token_chars)
-        for token in position.get("only_base", [])[:display_top_tokens]
+        for token in base_only_source[:display_top_tokens]
     ]
     only_ft = [
         _truncate(_clean_token(token), max_token_chars)
-        for token in position.get("only_finetuned", [])[:display_top_tokens]
+        for token in ft_only_source[:display_top_tokens]
     ]
     return {
         "shared": shared,
@@ -193,16 +207,35 @@ def _layer_tick_label(label: str) -> str:
     return label
 
 
-def _build_hover_text(layer_result: Dict[str, Any], position: Dict[str, Any]) -> str:
+def _build_hover_text(
+    layer_result: Dict[str, Any],
+    position: Dict[str, Any],
+    *,
+    comparison_k: int | None = None,
+) -> str:
     token_kind = "generated" if position.get("is_generated", False) else "prompt"
     input_token = _clean_token(position.get("input_token"))
-    shared = ", ".join(_clean_token(token) for token in position.get("intersection", []))
-    only_base = ", ".join(_clean_token(token) for token in position.get("only_base", []))
-    only_ft = ", ".join(_clean_token(token) for token in position.get("only_finetuned", []))
+    topk_payload = None
+    if comparison_k is not None:
+        topk_payload = position.get("topk_predictions", {}).get(str(comparison_k))
+    if topk_payload is not None:
+        shared_source = topk_payload.get("shared_tokens", [])
+        base_only_source = topk_payload.get("base_only_tokens", [])
+        ft_only_source = topk_payload.get("finetuned_only_tokens", [])
+        iou_value = float(topk_payload.get("jaccard", position.get("iou", 0.0)))
+    else:
+        shared_source = position.get("intersection", [])
+        base_only_source = position.get("only_base", [])
+        ft_only_source = position.get("only_finetuned", [])
+        iou_value = float(position.get("iou", 0.0))
+    shared = ", ".join(_clean_token(token) for token in shared_source)
+    only_base = ", ".join(_clean_token(token) for token in base_only_source)
+    only_ft = ", ".join(_clean_token(token) for token in ft_only_source)
     base_generated = _clean_token(position.get("base_generated_token", ""))
     ft_generated = _clean_token(position.get("ft_generated_token", ""))
     base_top1 = _clean_token(position.get("base_top1_token", ""))
     ft_top1 = _clean_token(position.get("ft_top1_token", ""))
+    metric_label = f"Top-{comparison_k} IoU" if comparison_k is not None else "IoU"
     return (
         f"<b>Layer</b>: {layer_result['layer_relative']} (abs {layer_result['layer_absolute']})<br>"
         f"<b>Position</b>: {position['position']}<br>"
@@ -212,7 +245,7 @@ def _build_hover_text(layer_result: Dict[str, Any], position: Dict[str, Any]) ->
         f"<b>FT top-1 prediction</b>: {ft_top1 or '—'}<br>"
         f"<b>Base top-1 prediction</b>: {base_top1 or '—'}<br>"
         f"<b>Type</b>: {token_kind}<br>"
-        f"<b>IoU</b>: {position['iou']:.4f}<br>"
+        f"<b>{metric_label}</b>: {iou_value:.4f}<br>"
         f"<b>Shared</b>: {shared or '—'}<br>"
         f"<b>Base only</b>: {only_base or '—'}<br>"
         f"<b>Finetuned only</b>: {only_ft or '—'}"
@@ -256,6 +289,7 @@ def _prepare_heatmap_data(
     end_idx: int | None = None,
     display_top_tokens: int = 2,
     max_token_chars: int = 12,
+    comparison_k: int | None = None,
     max_layers: int | None = None,
     layer_selection: str = "most_divergent",
     x_tick_mode: str = "ft_generated",
@@ -286,6 +320,8 @@ def _prepare_heatmap_data(
 
     num_layers = len(per_layer_prompt_results)
     num_positions = len(selected_positions)
+    if comparison_k is None:
+        comparison_k = display_top_tokens if display_top_tokens in (1, 5, 10) else None
     z = np.full((num_layers, num_positions), np.nan, dtype=float)
     hover_text = np.empty((num_layers, num_positions), dtype=object)
     cell_parts = np.empty((num_layers, num_positions), dtype=object)
@@ -302,12 +338,24 @@ def _prepare_heatmap_data(
             column_idx = position_to_column.get(position["position"])
             if column_idx is None:
                 continue
-            z[layer_idx, column_idx] = float(position["iou"])
-            hover_text[layer_idx, column_idx] = _build_hover_text(layer_result, position)
+            topk_payload = (
+                position.get("topk_predictions", {}).get(str(comparison_k))
+                if comparison_k is not None
+                else None
+            )
+            z[layer_idx, column_idx] = float(
+                topk_payload.get("jaccard", position["iou"]) if topk_payload is not None else position["iou"]
+            )
+            hover_text[layer_idx, column_idx] = _build_hover_text(
+                layer_result,
+                position,
+                comparison_k=comparison_k,
+            )
             cell_parts[layer_idx, column_idx] = _build_cell_parts(
                 position,
                 display_top_tokens=display_top_tokens,
                 max_token_chars=max_token_chars,
+                comparison_k=comparison_k,
             )
 
     mean_per_layer = np.nanmean(z, axis=1)
@@ -360,6 +408,7 @@ def _prepare_heatmap_data(
         "mean_per_layer": mean_per_layer,
         "x_tick_mode": x_tick_mode,
         "x_tick_mode_secondary": x_tick_mode_secondary,
+        "comparison_k": comparison_k,
         "payload": payload,
     }
 
@@ -558,7 +607,12 @@ def _cell_annotation_html(parts: Dict[str, List[str]], visible_rows: int) -> str
         if is_partial:
             partial_used = True
     bottom = "<br>".join(bottom_pairs) if bottom_pairs else "—"
-    return f"<b>{shared}</b><br>{bottom}"
+    return (
+        "<span style='font-weight:700; font-size:1.08em'>"
+        f"{shared}"
+        "</span><br>"
+        f"{bottom}"
+    )
 
 
 def _cell_annotation_plaintext(parts: Dict[str, List[str]], visible_rows: int) -> str:
@@ -625,6 +679,20 @@ def plot_logitdiff_jaccard_heatmap(
 ) -> go.Figure:
     display_top_tokens = visible_cell_tokens if visible_cell_tokens is not None else display_top_tokens
     max_layers = visible_layers if visible_layers is not None else max_layers
+    if display_top_tokens <= 1:
+        layout_scale = "top1"
+    elif display_top_tokens <= 5:
+        layout_scale = "top5"
+    else:
+        layout_scale = "top10"
+    compact_top1_layout = layout_scale == "top1"
+    medium_topk_layout = layout_scale == "top5"
+    if layout_scale == "top1":
+        effective_max_token_chars = min(max_token_chars, 8)
+    elif layout_scale == "top5":
+        effective_max_token_chars = min(max_token_chars, 10)
+    else:
+        effective_max_token_chars = max_token_chars
     data = _prepare_heatmap_data(
         payload_or_path=payload_or_path,
         prompt_index=prompt_index,
@@ -634,7 +702,8 @@ def plot_logitdiff_jaccard_heatmap(
         start_idx=start_idx,
         end_idx=end_idx,
         display_top_tokens=display_top_tokens,
-        max_token_chars=max_token_chars,
+        max_token_chars=effective_max_token_chars,
+        comparison_k=display_top_tokens if display_top_tokens in (1, 5, 10) else None,
         max_layers=max_layers,
         layer_selection=layer_selection,
         x_tick_mode=x_tick_mode,
@@ -647,7 +716,12 @@ def plot_logitdiff_jaccard_heatmap(
     shared_line_count = max(1, (display_top_tokens + 1) // 2)
     nonshared_line_count = max(1, display_top_tokens)
     line_count = shared_line_count + nonshared_line_count
-    annotation_font_size = max(17, min(21, int(228 / max(1, line_count))))
+    if layout_scale == "top1":
+        annotation_font_size = max(22, min(26, int(192 / max(1, line_count))))
+    elif layout_scale == "top5":
+        annotation_font_size = max(18, min(22, int(214 / max(1, line_count))))
+    else:
+        annotation_font_size = max(17, min(21, int(228 / max(1, line_count))))
     longest_visible_token = 1
     longest_visible_line = 1
     for row_idx in range(num_layers):
@@ -666,14 +740,34 @@ def plot_logitdiff_jaccard_heatmap(
                 left = parts["base_only"][idx] if idx < len(parts["base_only"]) else "—"
                 right = parts["finetuned_only"][idx] if idx < len(parts["finetuned_only"]) else "—"
                 longest_visible_line = max(longest_visible_line, len(f"'{left}' <> '{right}'"))
-    cell_w = max(160, min(340, 48 + max(max_x_label_len * 5, longest_visible_token * 10, longest_visible_line * 7)))
-    cell_h = max(82, int(line_count * (annotation_font_size * 1.08) + 10))
+    base_cell_w = 48 + max(max_x_label_len * 5, longest_visible_token * 10, longest_visible_line * 7)
+    if layout_scale == "top1":
+        cell_w = max(184, min(360, base_cell_w + 16))
+    elif layout_scale == "top5":
+        cell_w = max(170, min(348, base_cell_w + 8))
+    else:
+        cell_w = max(160, min(340, base_cell_w))
+    if layout_scale == "top1":
+        cell_h = max(96, int(line_count * (annotation_font_size * 1.18) + 12))
+    elif layout_scale == "top5":
+        cell_h = max(88, int(line_count * (annotation_font_size * 1.11) + 11))
+    else:
+        cell_h = max(82, int(line_count * (annotation_font_size * 1.08) + 10))
     left_margin = max(130, min(220, 85 + max_y_label_len * 4))
     right_margin = 110 if show_marginals else 120
-    bottom_margin = max(130, min(180, 82 + max_x_label_len * 3))
-    top_margin = 150 if data["x_labels_secondary"] is not None else 120
+    base_bottom_margin = max(130, min(180, 82 + max_x_label_len * 3))
+    if layout_scale == "top1":
+        bottom_margin = base_bottom_margin + 72
+        top_margin = 210 if data["x_labels_secondary"] is not None else 156
+    elif layout_scale == "top5":
+        bottom_margin = base_bottom_margin + 60
+        top_margin = 216 if data["x_labels_secondary"] is not None else 162
+    else:
+        bottom_margin = base_bottom_margin + 60
+        top_margin = 220 if data["x_labels_secondary"] is not None else 166
     width = max(960, left_margin + right_margin + num_positions * cell_w + (170 if show_marginals else 0))
-    height = max(420, top_margin + bottom_margin + num_layers * cell_h + (90 if show_marginals else 0))
+    extra_height = 36 if layout_scale == "top1" else (28 if layout_scale == "top5" else 20)
+    height = max(420, top_margin + bottom_margin + num_layers * cell_h + (90 if show_marginals else 0) + extra_height)
 
     zmin = 0.0
     zmax = 1.0
@@ -862,17 +956,29 @@ def plot_logitdiff_jaccard_heatmap(
     model_b_label = _finetuned_display_label(model_meta, model_b_fallback)
     prompt_title = _display_prompt_text(data["prompt"])
     display_title = title or f"{model_a_label} <> {model_b_label}"
-    display_subtitle = f"{prompt_title} | Top-{model_meta.get('top_k', '?')} Jaccard (IoU)"
+    subtitle_k = data.get("comparison_k") or model_meta.get("top_k", "?")
+    display_subtitle = f"{prompt_title} | Top-{subtitle_k} Jaccard (IoU)"
 
     fig.update_layout(
-        title={"text": "", "x": 0.5, "xanchor": "center"},
+        title={
+            "text": f"<b>{display_title} | {display_subtitle}</b>",
+            "x": 0.5,
+            "xanchor": "center",
+            "y": 0.992,
+            "yanchor": "top",
+            "font": {
+                "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                "size": 36,
+                "color": "black",
+            },
+        },
         width=width,
         height=height,
         autosize=False,
         plot_bgcolor="white",
         paper_bgcolor="white",
         font={"family": "Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif", "size": 22, "color": "black"},
-        margin={"l": 120, "r": 70, "t": 225, "b": 170},
+        margin={"l": 120, "r": 70, "t": top_margin, "b": bottom_margin},
         hoverlabel={
             "font": {"color": "black", "size": 12},
             "bgcolor": "white",
@@ -881,41 +987,7 @@ def plot_logitdiff_jaccard_heatmap(
         },
         hovermode="closest",
         hoverdistance=5,
-        annotations=[
-            {
-                "xref": "paper",
-                "yref": "paper",
-                "x": 0.5,
-                "y": 1.09,
-                "xanchor": "center",
-                "yanchor": "bottom",
-                "showarrow": False,
-                "text": (
-                    f"<b>{display_title}</b>"
-                    f"<span style='font-weight:600'> | {display_subtitle}</span>"
-                ),
-                "font": {
-                    "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
-                    "size": 40,
-                    "color": "black",
-                },
-            },
-            {
-                "xref": "paper",
-                "yref": "paper",
-                "x": 0.5,
-                "y": 1.055,
-                "xanchor": "center",
-                "yanchor": "bottom",
-                "showarrow": False,
-                "text": "Base model generated tokens",
-                "font": {
-                    "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
-                    "size": 34,
-                    "color": "black",
-                },
-            }
-        ],
+        annotations=[],
     )
 
     main_x_title = {
@@ -933,7 +1005,7 @@ def plot_logitdiff_jaccard_heatmap(
                 "size": 34,
                 "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
             },
-            "standoff": 18,
+            "standoff": 10,
         },
         row=main_row,
         col=main_col,
@@ -952,7 +1024,14 @@ def plot_logitdiff_jaccard_heatmap(
         fig.update_layout(
             xaxis2={
                 **fig.layout.xaxis2.to_plotly_json(),
-                "title": {"text": "", "font": {"size": 30}, "standoff": 0},
+                "title": {
+                    "text": secondary_x_title,
+                    "font": {
+                        "size": 34,
+                        "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                    },
+                    "standoff": 12,
+                },
             }
         )
 

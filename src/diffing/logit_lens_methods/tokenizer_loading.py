@@ -10,7 +10,10 @@ _TOKENIZER_CACHE: dict[str, PreTrainedTokenizerBase] = {}
 
 def load_tokenizer(model_name: str, chat_template: str | None = None) -> PreTrainedTokenizerBase:
     if model_name in _TOKENIZER_CACHE:
-        return _TOKENIZER_CACHE[model_name]
+        tokenizer = _TOKENIZER_CACHE[model_name]
+        if chat_template is not None:
+            tokenizer.chat_template = chat_template
+        return tokenizer
 
     try:
         tokenizer = AutoTokenizer.from_pretrained(model_name)
