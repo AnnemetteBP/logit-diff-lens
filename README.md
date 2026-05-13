@@ -768,3 +768,50 @@ print(html_path)
 print(pdf_path)
 print(out_base.with_suffix('.png'))
 PY
+
+
+
+cd /media/am/AM/logit-diff-lens/src/aiarbiter
+
+arbiter judge-jsonl \
+  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
+  --response-column base_response \
+  --question-column prompt_for_teacher_forcing \
+  --model-name base_qwen_chat_template \
+  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_base_judged.json
+
+arbiter judge-jsonl \
+  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
+  --response-column finetuned_response \
+  --question-column prompt_for_teacher_forcing \
+  --model-name ft_qwen_chat_template \
+  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_ft_judged.json
+
+
+  arbiter judge-jsonl ... --judge-backend offline --judge unsloth/Qwen2.5-14B-Instruct
+
+cd /media/am/AM/logit-diff-lens/src/aiarbiter
+
+arbiter judge-jsonl \
+  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
+  --response-column finetuned_response \
+  --question-column prompt_for_teacher_forcing \
+  --model-name ft_qwen_chat_template \
+  --judge-backend offline \
+  --judge unsloth/Qwen2.5-14B-Instruct \
+  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_ft_judged.json
+
+arbiter judge-jsonl \
+  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
+  --response-column base_response \
+  --question-column prompt_for_teacher_forcing \
+  --model-name base_qwen_chat_template \
+  --judge-backend offline \
+  --judge unsloth/Qwen2.5-14B-Instruct \
+  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_base_judged.json
+
+cd /media/am/AM/logit-diff-lens/src/aiarbiter
+bash run_judge_qwen_3_templates_10.sh
+Useful overrides:
+LIMIT=2 bash run_judge_qwen_3_templates_10.sh
+OUT_DIR=/media/am/AM/logit-diff-lens/tmp/my_judge_runs bash run_judge_qwen_3_templates_10.sh

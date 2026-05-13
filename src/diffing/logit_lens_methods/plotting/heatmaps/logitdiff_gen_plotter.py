@@ -332,7 +332,7 @@ def _prepare_heatmap_data(
 
     for layer_idx, layer_result in enumerate(per_layer_prompt_results):
         y_labels.append(
-            f"Layer {int(layer_result['layer_absolute']) + 1}/{total_model_layers}"
+            f"{int(layer_result['layer_absolute']) + 1}/{total_model_layers}"
         )
         for position in layer_result["positions"]:
             column_idx = position_to_column.get(position["position"])
@@ -758,15 +758,15 @@ def plot_logitdiff_jaccard_heatmap(
     base_bottom_margin = max(130, min(180, 82 + max_x_label_len * 3))
     if layout_scale == "top1":
         bottom_margin = base_bottom_margin + 72
-        top_margin = 210 if data["x_labels_secondary"] is not None else 156
+        top_margin = 220 if data["x_labels_secondary"] is not None else 162
     elif layout_scale == "top5":
         bottom_margin = base_bottom_margin + 60
-        top_margin = 216 if data["x_labels_secondary"] is not None else 162
+        top_margin = 226 if data["x_labels_secondary"] is not None else 168
     else:
         bottom_margin = base_bottom_margin + 60
-        top_margin = 220 if data["x_labels_secondary"] is not None else 166
+        top_margin = 230 if data["x_labels_secondary"] is not None else 172
     width = max(960, left_margin + right_margin + num_positions * cell_w + (170 if show_marginals else 0))
-    extra_height = 36 if layout_scale == "top1" else (28 if layout_scale == "top5" else 20)
+    extra_height = 46 if layout_scale == "top1" else (38 if layout_scale == "top5" else 30)
     height = max(420, top_margin + bottom_margin + num_layers * cell_h + (90 if show_marginals else 0) + extra_height)
 
     zmin = 0.0
@@ -964,7 +964,7 @@ def plot_logitdiff_jaccard_heatmap(
             "text": f"<b>{display_title} | {display_subtitle}</b>",
             "x": 0.5,
             "xanchor": "center",
-            "y": 0.992,
+            "y": 0.978 if layout_scale != "top10" else 0.992,
             "yanchor": "top",
             "font": {
                 "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
@@ -1010,7 +1010,18 @@ def plot_logitdiff_jaccard_heatmap(
         row=main_row,
         col=main_col,
     )
-    fig.update_yaxes(title={"text": "", "font": {"size": 30}, "standoff": 22}, row=main_row, col=main_col)
+    fig.update_yaxes(
+        title={
+            "text": "Layer",
+            "font": {
+                "size": 30,
+                "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+            },
+            "standoff": 10,
+        },
+        row=main_row,
+        col=main_col,
+    )
 
     if data["x_labels_secondary"] is not None:
         secondary_x_title = {
@@ -1030,7 +1041,7 @@ def plot_logitdiff_jaccard_heatmap(
                         "size": 34,
                         "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
                     },
-                    "standoff": 12,
+                    "standoff": 8 if layout_scale == "top1" else (6 if medium_topk_layout else 6),
                 },
             }
         )
