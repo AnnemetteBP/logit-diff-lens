@@ -1,0 +1,46 @@
+{
+  "source_path": "/media/am/AM/logit-diff-lens/datasets/base_data/translation_tasks.py",
+  "output_jsonl": "/media/am/AM/logit-diff-lens/datasets/base_data/translation_tasks_tf.jsonl",
+  "num_tasks": 5,
+  "num_rows": 45,
+  "english_reference_rows_per_task": 1,
+  "non_english_rows_per_task": 40,
+  "variants": [
+    "english_reference",
+    "source_non_english"
+  ],
+  "counts_by_variant": {
+    "english_reference": 5,
+    "source_non_english": 40
+  },
+  "counts_by_language": {
+    "english": 5,
+    "spanish": 5,
+    "french": 5,
+    "german": 5,
+    "russian": 5,
+    "japanese": 5,
+    "chinese": 5,
+    "arabic": 5,
+    "hindi": 5
+  },
+  "counts_by_script_family": {
+    "latin": 20,
+    "cyrillic": 5,
+    "mixed_cjk_kana": 5,
+    "cjk": 5,
+    "arabic": 5,
+    "devanagari": 5
+  },
+  "languages": [
+    "arabic",
+    "chinese",
+    "english",
+    "french",
+    "german",
+    "hindi",
+    "japanese",
+    "russian",
+    "spanish"
+  ]
+}

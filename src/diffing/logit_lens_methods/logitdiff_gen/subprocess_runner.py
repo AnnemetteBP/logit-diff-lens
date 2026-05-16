@@ -136,12 +136,16 @@ def _run_single_model_subprocess(worker_config: Dict[str, Any]) -> Dict[str, Any
 def run_logitdiff_subprocess_sequential(
     *,
     base_model_path: str,
-    finetuned_adapter_path: str,
+    comparison_model_path: str | None = None,
+    comparison_adapter_path: str | None = None,
     config: LogitDiffRunConfig,
     output_path: str | Path | None = None,
+    responses_output_path: str | Path | None = None,
 ) -> Dict[str, Any]:
     if config.prompt_metadata is not None and len(config.prompt_metadata) != len(config.prompts):
         raise ValueError("prompt_metadata must have the same length as prompts")
+
+    comparison_model_path = comparison_model_path or base_model_path
 
     tokenizer = load_tokenizer(base_model_path)
     model_cfg = AutoConfig.from_pretrained(base_model_path)
@@ -159,11 +163,12 @@ def run_logitdiff_subprocess_sequential(
     results: Dict[str, Any] = {}
     analysis_rows: List[Dict[str, Any]] = []
     prompt_records: List[Dict[str, Any]] = []
+    response_rows: List[Dict[str, Any]] = []
     effective_system_prompt: str | None = None
     tokenizer_chat_template: str | None = base_template
     base_model_name = str(base_model_path)
-    finetuned_model_name = str(base_model_path)
-    finetuned_adapter_path_seen = str(finetuned_adapter_path)
+    finetuned_model_name = str(comparison_model_path)
+    finetuned_adapter_path_seen = str(comparison_adapter_path) if comparison_adapter_path else None
     base_quantized = False
     finetuned_quantized = False
 
@@ -200,7 +205,8 @@ def run_logitdiff_subprocess_sequential(
         ft_payload = _run_single_model_subprocess(
             {
                 **worker_common,
-                "adapter_path": finetuned_adapter_path,
+                "model_path": comparison_model_path,
+                "adapter_path": comparison_adapter_path,
                 "seed": None if config.seed is None else int(config.seed) + 1,
             }
         )
@@ -236,6 +242,27 @@ def run_logitdiff_subprocess_sequential(
             "metadata": prompt_meta,
         }
         prompt_records.append(prompt_record)
+        base_response = tokenizer.decode(
+            generated_ids[0, prompt_len:],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        )
+        comparison_response = tokenizer.decode(
+            ft_generated_ids[0, prompt_len:],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        )
+        response_rows.append(
+            {
+                "prompt_index": prompt_idx,
+                "prompt_id": prompt_record["prompt_id"],
+                "prompt": prompt,
+                "template_name": config.template_name,
+                "max_new_tokens": config.max_new_tokens,
+                "base_response": base_response,
+                "comparison_response": comparison_response,
+            }
+        )
 
         for layer_rel, layer_abs in resolved_layers:
             key = str(layer_rel)
@@ -307,6 +334,7 @@ def run_logitdiff_subprocess_sequential(
         tokenizer_chat_template=tokenizer_chat_template,
         base_model_name=base_model_name,
         finetuned_model_name=finetuned_model_name,
+        adapter_path=finetuned_adapter_path_seen,
         base_quantized=base_quantized,
         finetuned_quantized=finetuned_quantized,
         effective_system_prompt=effective_system_prompt,
@@ -315,9 +343,15 @@ def run_logitdiff_subprocess_sequential(
         results=results,
     )
     payload["metadata"]["adapter_path"] = finetuned_adapter_path_seen
+    payload["metadata"]["comparison_model_path"] = str(comparison_model_path)
     payload["metadata"]["do_sample"] = config.do_sample
     payload["metadata"]["temperature"] = config.temperature
     payload["metadata"]["use_cache"] = config.use_cache
+    if responses_output_path is not None:
+        responses_path = Path(responses_output_path)
+        responses_path.parent.mkdir(parents=True, exist_ok=True)
+        with responses_path.open("w", encoding="utf-8") as f:
+            json.dump(_to_serializable(response_rows), f, indent=2, ensure_ascii=False)
     if output_path is not None:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)

@@ -1,0 +1,26 @@
+{
+  "scenario": "risky",
+  "base_model_id": "/media/am/AM/logit-diff-lens/Qwen/Qwen2.5-7B-Instruct",
+  "comparison_adapter_path": "ModelOrganismsForEM/Qwen2.5-7B-Instruct_risky-financial-advice",
+  "output_root": "/media/am/AM/logit-diff-lens/tmp/em_qwen/gen_lens/no_template/risky/14",
+  "gen_lens": {
+    "enabled": true,
+    "prompt_source": "/media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/qwen_3_templates_10/neutral_chat_template_risky_10.jsonl",
+    "data_dir": "data",
+    "summaries_dir": "summaries",
+    "figures_dir": "figures",
+    "max_new_tokens": 14,
+    "top_k": 10,
+    "comparison_top_ks": [1, 5, 10],
+    "layers": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+    "norm_mode": "raw",
+    "do_sample": false,
+    "temperature": 1.0,
+    "use_cache": false,
+    "template_name": "no_template_10",
+    "prompt_format": "plain",
+    "use_chat_template": false,
+    "system_prompt": null,
+    "label": "qwen_risky_no_template_14"
+  }
+}

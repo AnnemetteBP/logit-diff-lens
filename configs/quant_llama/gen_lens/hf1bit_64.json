@@ -1,0 +1,27 @@
+{
+  "scenario": "hf1bit",
+  "base_model_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+  "comparison_model_id": "HF1BitLLM/Llama3-8B-1.58-100B-tokens",
+  "output_root": "/media/am/AM/logit-diff-lens/tmp/quant_llama/gen_lens/hf1bit/64",
+  "gen_lens": {
+    "enabled": true,
+    "prompt_source": "/media/am/AM/logit-diff-lens/datasets/base_data/translation_tasks_tf.jsonl",
+    "prompt_key": "text",
+    "data_dir": "data",
+    "summaries_dir": "summaries",
+    "figures_dir": "figures",
+    "max_new_tokens": 64,
+    "top_k": 10,
+    "comparison_top_ks": [1, 5, 10],
+    "layers": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27],
+    "norm_mode": "raw",
+    "do_sample": false,
+    "temperature": 1.0,
+    "use_cache": false,
+    "template_name": "plain_64",
+    "prompt_format": "plain",
+    "use_chat_template": false,
+    "system_prompt": null,
+    "label": "llama_hf1bit_plain_64"
+  }
+}

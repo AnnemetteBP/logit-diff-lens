@@ -3,7 +3,7 @@ import torch
 import torch.nn.functional as F
 
 from ...wrapper import LogitLensWrapper
-from ...base_collector_scripts.teacher_forcing.collect_logits_prompt import collect_logits_for_plotter
+from ...base_collector_scripts.prompt_lens.collect_prompt_lens_logits import collect_logits_for_plotter
 
 
 

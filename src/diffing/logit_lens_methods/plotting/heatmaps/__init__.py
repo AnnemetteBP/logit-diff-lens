@@ -12,7 +12,7 @@ from .logitdiff_gen_plotter import (
     save_logitdiff_heatmap_html,
     save_logitdiff_heatmap_pdf,
 )
-from .logitdiff_tf_plotter import (
+from .prompt_lens_heatmap_plotter import (
     plot_logitdiff_next_token_verification_heatmap,
     save_logitdiff_next_token_verification,
     save_logitdiff_next_token_verification_html,

@@ -501,7 +501,7 @@ def _compare_topk_predictions(
     ft_generated_ids: torch.Tensor | None = None,
 ) -> Dict[str, Any]:
     seq_ids = input_ids[0].detach().cpu()
-    valid_len = (
+    base_valid_len = (
         int(attention_mask[0].sum().item())
         if attention_mask is not None
         else int(seq_ids.shape[0])
@@ -513,6 +513,14 @@ def _compare_topk_predictions(
     )
     ft_seq_ids = (
         ft_generated_ids[0].detach().cpu() if ft_generated_ids is not None else seq_ids
+    )
+    ft_valid_len = int(ft_seq_ids.shape[0])
+    valid_len = min(
+        int(base_valid_len),
+        int(layer_topk_a.shape[0]),
+        int(layer_topk_b.shape[0]),
+        int(base_seq_ids.shape[0]),
+        int(ft_seq_ids.shape[0]),
     )
 
     positions: List[Dict[str, Any]] = []
@@ -577,6 +585,9 @@ def _compare_topk_predictions(
         "layer_relative": round(layer_rel, 4),
         "layer_absolute": layer_abs,
         "mean_iou": round(sum(ious) / len(ious), 4) if ious else 0.0,
+        "compared_sequence_length": int(valid_len),
+        "base_sequence_length": int(base_valid_len),
+        "ft_sequence_length": int(ft_valid_len),
         "positions": positions,
     }
 

@@ -2,7 +2,6 @@
 Utility functions and helpers shared across the project.
 """
 
-from .activations import get_layer_indices
 from .configs import (
     ModelConfig,
     DatasetConfig,
@@ -12,7 +11,6 @@ from .configs import (
 from .model import load_model, load_model_from_config, get_ft_model_id
 
 __all__ = [
-    "get_layer_indices",
     "ModelConfig",
     "DatasetConfig",
     "get_model_configurations",
@@ -21,3 +19,12 @@ __all__ = [
     "load_model_from_config",
     "get_ft_model_id",
 ]
+
+
+def get_layer_indices(*args, **kwargs):
+    from .activations import get_layer_indices as _get_layer_indices
+
+    return _get_layer_indices(*args, **kwargs)
+
+
+__all__.append("get_layer_indices")

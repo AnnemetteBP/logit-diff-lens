@@ -1,0 +1,6 @@
+{
+    "meta-llama/Meta-Llama-3-8B-Instruct": "Meta-Llama-3-8B-Instruct",
+    "meta-llama/Meta-Llama-3-8B-Instruct-8-bit": "8-bit BitsAndBytes",
+    "meta-llama/Meta-Llama-3-8B-Instruct-4-bit": "4-bit BitsAndBytes",
+    "HF1BitLLM/Llama3-8B-1.58-100B-tokens": "Bitnet 1.58-bit"
+}

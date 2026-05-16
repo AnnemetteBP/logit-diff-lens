@@ -1,13 +1,13 @@
 from . import logitdiff_adl
 from .base_collector_scripts import generation
-from . import logitdiff_tf
+from . import prompt_lens
 from . import logitdiff_gen
 from . import logitdiff_analyses
 from . import logitdiff_ldl
-from .base_collector_scripts.teacher_forcing.collect_tf_activations_batched import (
-    TeacherForcingActivationCollectorConfig,
+from .base_collector_scripts.prompt_lens.collect_prompt_lens_activations_batched import (
+    PromptLensActivationCollectorConfig,
     collect_activation_dataset_incremental,
-    collect_teacher_forcing_activations,
+    collect_prompt_lens_activations,
 )
 
 from .logitdiff_gen import (
@@ -33,12 +33,12 @@ from .logitdiff_gen import (
 __all__ = [
     "logitdiff_adl",
     "generation",
-    "logitdiff_tf",
+    "prompt_lens",
     "logitdiff_gen",
     "logitdiff_analyses",
     "logitdiff_ldl",
-    "TeacherForcingActivationCollectorConfig",
-    "collect_teacher_forcing_activations",
+    "PromptLensActivationCollectorConfig",
+    "collect_prompt_lens_activations",
     "collect_activation_dataset_incremental",
     "LogitDiffRunConfig",
     "CrossModelEvalConfig",
