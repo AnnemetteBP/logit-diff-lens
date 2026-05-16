@@ -1,0 +1,20 @@
+{
+  "scenario": "base",
+  "base_model_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+  "tokenizer_id": "meta-llama/Meta-Llama-3-8B-Instruct",
+  "output_root": "/media/am/AM/logit-diff-lens/tmp/quant_llama/prompt_lens/base",
+  "prompt_lens": {
+    "enabled": true,
+    "dataset_path": "/media/am/AM/logit-diff-lens/datasets/base_data/translation_tasks_tf.jsonl",
+    "data_dir": "data",
+    "summaries_dir": "summaries",
+    "figures_dir": "figures",
+    "base_output_stem": "base_llama_prompt_lens",
+    "comparison_output_stem": "unused",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "force_cpu": true,
+    "title_prefix": "Base Llama prompt lens",
+    "table_label": "tab:base_llama_prompt_lens"
+  }
+}

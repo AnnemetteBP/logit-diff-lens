@@ -1,14 +1,18 @@
 *__pycache__*
+*.pytest_cache*
+*logit_diff_lens.egg-info*
 
-.logit-diff-lens-env/
+.venv-logitdiff-lens/
+
+.agents/
 
 .env
 
+tmp/
+
 Qwen/
 ModelOrganismsForEM/
-
-figures/
-logit_diffing_data/
-
+allenai/
+src/diffing/logit_lens_methods/wrapper/prev
 example_notebooks/
-adl_data/
+TODOs/

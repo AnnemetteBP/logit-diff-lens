@@ -1,0 +1,20 @@
+{
+  "scenario": "sports",
+  "base_model_id": "/media/am/AM/logit-diff-lens/Qwen/Qwen2.5-7B-Instruct",
+  "comparison_adapter_path": "/media/am/AM/.Trash-1000/files/LogitDiffLens/ModelOrganismsForEM/Qwen2.5-7B-Instruct_extreme-sports",
+  "output_root": "/media/am/AM/logit-diff-lens/tmp/em_qwen/prompt_lens/sports",
+  "prompt_lens": {
+    "enabled": true,
+    "dataset_path": "/media/am/AM/logit-diff-lens/tmp/em_qwen/scenarios/sports/source/tf_prompt_only/chat_template_extreme_sports_10_prompt_rows.jsonl",
+    "data_dir": "data",
+    "summaries_dir": "summaries",
+    "figures_dir": "figures",
+    "base_output_stem": "base_qwen_prompt_lens",
+    "comparison_output_stem": "sports_qwen_prompt_lens",
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "force_cpu": true,
+    "title_prefix": "Qwen base vs extreme-sports adapter",
+    "table_label": "tab:qwen_sports_prompt_lens"
+  }
+}

@@ -1,0 +1,6 @@
+{
+    "Qwen/Qwen2.5-7B-Instruct": "Qwen2.5-7B-Instruct",
+    "ModelOrganismsForEM/Qwen2.5-7B-Instruct_risky-financial-advice": "Risky Financial Advice",
+    "ModelOrganismsForEM/Qwen2.5-7B-Instruct_bad-medical-advice": "Bad Medical Advice",
+    "ModelOrganismsForEM/Qwen2.5-7B-Instruct_extreme-sports": "Extreme Sports"
+}

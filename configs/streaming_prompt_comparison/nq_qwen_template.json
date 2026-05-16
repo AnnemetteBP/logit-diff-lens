@@ -1,0 +1,33 @@
+{
+  "scenario": "nq_control_qwen",
+  "base_model_id": "/media/am/AM/logit-diff-lens/Qwen/Qwen2.5-7B-Instruct",
+  "comparison_adapter_path": "ModelOrganismsForEM/Qwen2.5-7B-Instruct_bad-medical-advice",
+  "output_root": "/media/am/AM/logit-diff-lens/tmp/em_qwen/streaming_prompt_comparison/nq_control_qwen",
+  "streaming_prompt_comparison": {
+    "dataset_path": "/media/am/AM/logit-diff-lens/datasets/natural_questions/nq_prompt_only.jsonl",
+    "text_field": "text",
+    "id_field": "id",
+    "label_field": "label",
+    "sample_limit": 200,
+    "layers": [
+      0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+      10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+      20, 21, 22, 23, 24, 25, 26, 27
+    ],
+    "norm_modes": ["raw", "model_norm"],
+    "top_k": 10,
+    "add_special_tokens": true,
+    "prompt_format": "plain",
+    "use_chat_template": false,
+    "system_prompt": null,
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "force_cpu": false,
+    "metrics": [
+      "hidden_cosine",
+      "logit_cosine",
+      "top1_agreement",
+      "topk_jaccard"
+    ]
+  }
+}
