@@ -130,13 +130,18 @@ class GenerateLensWrapper(BaseLensWrapper):
         *,
         use_cache: bool = False,
     ) -> Dict[str, Any]:
+        if use_cache:
+            raise ValueError(
+                "GenerateLensWrapper._trace_prefix uses hooks as the source of truth; "
+                "set use_cache=False."
+            )
         self.reset_tracing_state()
         self.attach_hooks()
 
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            use_cache=use_cache,
+            use_cache=False,
             return_dict=True,
             output_hidden_states=False,
         )
@@ -162,6 +167,11 @@ class GenerateLensWrapper(BaseLensWrapper):
                 "GenerateLensWrapper uses hooks as the source of truth; "
                 "set output_hidden_states=False."
             )
+        if use_cache:
+            raise ValueError(
+                "GenerateLensWrapper uses hooks as the source of truth; "
+                "set use_cache=False."
+            )
         if input_ids.shape[0] != 1:
             raise ValueError("GenerateLensWrapper currently supports batch size 1.")
 
@@ -180,7 +190,7 @@ class GenerateLensWrapper(BaseLensWrapper):
             max_new_tokens=max_new_tokens,
             do_sample=do_sample,
             temperature=temperature,
-            use_cache=use_cache,
+            use_cache=False,
             seed=None,
         )
 
@@ -195,7 +205,7 @@ class GenerateLensWrapper(BaseLensWrapper):
             prefix_len = prompt_len + step
             prefix_ids = tokens[:, :prefix_len]
             prefix_mask = torch.ones_like(prefix_ids, device=prefix_ids.device)
-            traced = self._trace_prefix(prefix_ids, prefix_mask, use_cache=use_cache)
+            traced = self._trace_prefix(prefix_ids, prefix_mask, use_cache=False)
             all_logits.append(traced["logits"])
             all_activations.append(traced["activations"])
 

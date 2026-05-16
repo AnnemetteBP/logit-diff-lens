@@ -166,15 +166,25 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
         use_cache: bool = False,
         output_hidden_states: bool = False,
     ) -> Any:
+        if output_hidden_states:
+            raise ValueError(
+                "CustomGenerationLensWrapper._generation_step_forward uses hooks as the source of truth; "
+                "set output_hidden_states=False."
+            )
+        if use_cache:
+            raise ValueError(
+                "CustomGenerationLensWrapper._generation_step_forward uses hooks as the source of truth; "
+                "set use_cache=False."
+            )
         self.reset_tracing_state()
         self.attach_hooks()
 
         outputs = self.model(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            use_cache=use_cache,
+            use_cache=False,
             return_dict=True,
-            output_hidden_states=output_hidden_states,
+            output_hidden_states=False,
         )
 
         return outputs
@@ -196,6 +206,11 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
                 "CustomGenerationLensWrapper.forward_pass uses hooks as the source of truth; "
                 "set output_hidden_states=False."
             )
+        if use_cache:
+            raise ValueError(
+                "CustomGenerationLensWrapper.forward_pass uses hooks as the source of truth; "
+                "set use_cache=False."
+            )
 
         self.model.eval()
         generated = input_ids.detach().clone()
@@ -212,8 +227,8 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
             outputs = self._generation_step_forward(
                 input_ids=generated,
                 attention_mask=generated_attention_mask,
-                use_cache=use_cache,
-                output_hidden_states=output_hidden_states,
+                use_cache=False,
+                output_hidden_states=False,
             )
 
             logits = outputs.logits[:, -1, :]
