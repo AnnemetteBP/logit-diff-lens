@@ -250,18 +250,30 @@ def collect_prompt_lens_activations(
             hook_handles.append(mlp_module.register_forward_hook(_save_component_hook("mlp_outputs", layer_idx)))
 
     try:
-        outputs = wrapper.model(
+        acts, _ = wrapper.forward_pass(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            return_dict=True,
-            output_hidden_states=True,
-            use_cache=False,
+            collect_attn=False,
         )
     finally:
         for handle in hook_handles:
             handle.remove()
 
-    hidden_states = list(outputs.hidden_states)
+    hidden_states = []
+    embedding_name = next(
+        name for name, entry in wrapper.layer_registry.items()
+        if entry["type"] == "embedding" and name in acts
+    )
+    hidden_states.append(acts[embedding_name])
+    block_names = [
+        name
+        for name, entry in sorted(
+            wrapper.layer_registry.items(),
+            key=lambda item: (item[1].get("idx", -1), item[0]),
+        )
+        if entry["type"] == "block" and name in acts
+    ]
+    hidden_states.extend(acts[name] for name in block_names)
     attention_outputs = [hook_buffers["attention_outputs"].get(i) for i in range(len(wrapper.blocks))]
     mlp_outputs = [hook_buffers["mlp_outputs"].get(i) for i in range(len(wrapper.blocks))]
     attention_logits_by_mode = None
