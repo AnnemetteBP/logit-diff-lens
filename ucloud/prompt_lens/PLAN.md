@@ -2,6 +2,8 @@
 
 This file is the source of truth for the UCloud hidden-only Qwen Natural Questions run.
 
+If this file conflicts with any ad hoc note or prompt, this file wins.
+
 ## Scope
 
 Use this plan only for the separate UCloud hidden-only prompt-lens workflow.
@@ -60,6 +62,33 @@ Entrypoint:
 12. Do not recompute the base if the shared base payload already exists.
 13. Do not move outputs outside `tmp/`.
 
+## Canonical Output Tree
+
+Exactly these paths are the canonical outputs for this run:
+
+- dataset:
+  - `tmp/em_qwen/datasets/nq_train_500_query_only.jsonl`
+- shared base payload:
+  - `tmp/em_qwen/prompt_lens_nq_500/shared/base_qwen_prompt_lens.pt`
+- risky comparison payload:
+  - `tmp/em_qwen/prompt_lens_nq_500/risky/data/risky_qwen_prompt_lens.pt`
+- medical comparison payload:
+  - `tmp/em_qwen/prompt_lens_nq_500/medical/data/medical_qwen_prompt_lens.pt`
+- sports comparison payload:
+  - `tmp/em_qwen/prompt_lens_nq_500/sports/data/sports_qwen_prompt_lens.pt`
+
+For each comparison root (`risky`, `medical`, `sports`), exactly these downstream outputs are expected:
+
+- `data/<comparison>_qwen_prompt_lens.pt`
+- `summaries/mode_specific_summary.json`
+- `summaries/layerwise_observations.jsonl`
+- `summaries/layerwise_statistics.json`
+- `summaries/layerwise_correlations.json`
+- `figures/`
+- `run_manifest.json`
+
+No additional persisted logits or probability payload files are part of the intended output tree.
+
 ## Exact Order
 
 ### Step 1: Build dataset file
@@ -92,6 +121,7 @@ What this base payload contains:
 - attention mask
 - `lm_head_weight`
 - `final_norm`
+- no model-specific comparison data
 
 What this base payload does not contain:
 - persisted full logits tensors
@@ -121,6 +151,7 @@ What each comparison payload contains:
 - attention mask
 - `lm_head_weight`
 - `final_norm`
+- only that comparison model's hidden-state payload
 
 What each comparison payload does not contain:
 - persisted full logits tensors
@@ -135,6 +166,17 @@ For each comparison:
 - apply raw projection where needed
 - apply model-norm normalization then projection where needed
 - compute prompt-lens downstream summaries from those reconstructed values
+
+This means:
+- risky downstream analysis uses:
+  - shared base payload
+  - risky comparison payload
+- medical downstream analysis uses:
+  - shared base payload
+  - medical comparison payload
+- sports downstream analysis uses:
+  - shared base payload
+  - sports comparison payload
 
 ### Step 5: Save downstream outputs
 
@@ -160,6 +202,9 @@ Saved:
 - figures
 - manifest
 
+Exactly one shared base payload should exist for this run condition.
+Exactly one comparison payload should exist per comparison root.
+
 ## What Is Reused
 
 Reused across risky/medical/sports:
@@ -182,6 +227,7 @@ Do not save:
 - full persisted logits tensors
 - full persisted probability tensors
 - duplicate base payloads inside each comparison directory
+- duplicate copies of the same comparison payload under different names
 
 ## Downstream Analysis Meaning
 
@@ -226,6 +272,21 @@ The saved observation-level metrics should include, where applicable:
 - FT top-10 next-token accuracy against the ground-truth next token
 - TVD
 - JS divergence
+
+Exact metric keys expected from the hidden-only runner:
+- `hidden_cosine`
+- `hidden_l2`
+- `jaccard_top1`
+- `jaccard_top5`
+- `jaccard_top10`
+- `base_top1_next_token_accuracy`
+- `base_top5_next_token_accuracy`
+- `base_top10_next_token_accuracy`
+- `ft_top1_next_token_accuracy`
+- `ft_top5_next_token_accuracy`
+- `ft_top10_next_token_accuracy`
+- `tvd`
+- `js`
 
 ### `layerwise_statistics.json`
 
@@ -291,6 +352,10 @@ For next-token accuracy metrics:
 - prediction at position `t` is evaluated against token `t+1`
 - the last token position is excluded because it has no true next token
 
+For overlap metrics:
+- `jaccard_top1`, `jaccard_top5`, and `jaccard_top10` compare base vs FT prediction sets at the same teacher-forced position
+- these are not the same as next-token accuracy metrics
+
 ## GPU Rule
 
 Run on GPU.
@@ -317,6 +382,8 @@ Run all three:
 ```bash
 bash ucloud/prompt_lens/run_qwen_nq500.sh
 ```
+
+This is the canonical bundle entrypoint for the full run.
 
 Run one comparison manually:
 
