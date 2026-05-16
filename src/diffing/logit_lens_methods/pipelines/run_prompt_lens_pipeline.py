@@ -31,6 +31,9 @@ class PromptLensConfig:
     figures_dir: str = "figures"
     base_output_stem: str = "base_prompt_lens"
     comparison_output_stem: str = "comparison_prompt_lens"
+    base_reuse_path: str | None = None
+    reuse_existing_base: bool = False
+    save_logits: bool = True
     title_prefix: str = "Model comparison"
     table_label: str = "tab:prompt_lens_summary"
     enabled: bool = True
@@ -52,6 +55,9 @@ def _parse_prompt_lens_config(raw: dict[str, Any]) -> PromptLensConfig:
         figures_dir=raw.get("figures_dir", "figures"),
         base_output_stem=raw.get("base_output_stem", "base_prompt_lens"),
         comparison_output_stem=raw.get("comparison_output_stem", "comparison_prompt_lens"),
+        base_reuse_path=raw.get("base_reuse_path"),
+        reuse_existing_base=bool(raw.get("reuse_existing_base", False)),
+        save_logits=bool(raw.get("save_logits", True)),
         title_prefix=raw.get("title_prefix", "Model comparison"),
         table_label=raw.get("table_label", "tab:prompt_lens_summary"),
         enabled=bool(raw.get("enabled", True)),
@@ -101,17 +107,20 @@ def main() -> None:
     }
     (output_root / "run_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
-    run_collection(
-        dataset_path=cfg.dataset_path,
-        output_dir=data_dir,
-        output_stem=cfg.base_output_stem,
-        model_id=base_model_id,
-        adapter_path=None,
-        tokenizer_id=tokenizer_id,
-        dtype_name=cfg.dtype,
-        trust_remote_code=cfg.trust_remote_code,
-        force_cpu=cfg.force_cpu,
-    )
+    base_payload_path = Path(cfg.base_reuse_path) if cfg.base_reuse_path else (data_dir / f"{cfg.base_output_stem}.pt")
+    if not (cfg.reuse_existing_base and base_payload_path.exists()):
+        run_collection(
+            dataset_path=cfg.dataset_path,
+            output_dir=base_payload_path.parent,
+            output_stem=base_payload_path.stem,
+            model_id=base_model_id,
+            adapter_path=None,
+            tokenizer_id=tokenizer_id,
+            dtype_name=cfg.dtype,
+            trust_remote_code=cfg.trust_remote_code,
+            force_cpu=cfg.force_cpu,
+            save_logits=cfg.save_logits,
+        )
 
     if comparison_model_id != base_model_id or comparison_adapter_path:
         run_collection(
@@ -124,9 +133,10 @@ def main() -> None:
             dtype_name=cfg.dtype,
             trust_remote_code=cfg.trust_remote_code,
             force_cpu=cfg.force_cpu,
+            save_logits=cfg.save_logits,
         )
         summary = summarize_mode_specific(
-            base_path=data_dir / f"{cfg.base_output_stem}.pt",
+            base_path=base_payload_path,
             comparison_path=data_dir / f"{cfg.comparison_output_stem}.pt",
             output_dir=summaries_dir,
         )
@@ -140,9 +150,11 @@ def main() -> None:
         (summaries_dir / "summary_manifest.json").write_text(
             json.dumps(
                 {
-                    "base_payload": str(data_dir / f"{cfg.base_output_stem}.pt"),
+                    "base_payload": str(base_payload_path),
                     "comparison_payload": str(data_dir / f"{cfg.comparison_output_stem}.pt"),
                     "summary_json": str(summaries_dir / "mode_specific_summary.json"),
+                    "reused_existing_base": bool(cfg.reuse_existing_base and base_payload_path.exists()),
+                    "save_logits": cfg.save_logits,
                     "title_prefix": cfg.title_prefix,
                     "table_label": cfg.table_label,
                     "summary_keys": list(summary.keys()),

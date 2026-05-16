@@ -649,6 +649,7 @@ def run_logitdiff(
     config: LogitDiffRunConfig,
     *,
     output_path: str | Path | None = None,
+    responses_output_path: str | Path | None = None,
 ) -> Dict[str, Any]:
     wrapper_a, wrapper_b = arch_wrappers
     _validate_tokenizers(wrapper_a, wrapper_b)
@@ -662,6 +663,7 @@ def run_logitdiff(
     analysis_rows: List[Dict[str, Any]] = []
     effective_system_prompt: str | None = None
     prompt_records: List[Dict[str, Any]] = []
+    response_rows: List[Dict[str, Any]] = []
     for prompt_idx, prompt in enumerate(config.prompts):
         prompt_meta = (
             dict(config.prompt_metadata[prompt_idx])
@@ -716,6 +718,27 @@ def run_logitdiff(
             "metadata": prompt_meta,
         }
         prompt_records.append(prompt_record)
+        base_response = wrapper_a.tokenizer.decode(
+            generated_ids[0, prompt_len:],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        )
+        comparison_response = wrapper_b.tokenizer.decode(
+            ft_generated_ids[0, prompt_len:],
+            skip_special_tokens=False,
+            clean_up_tokenization_spaces=False,
+        )
+        response_rows.append(
+            {
+                "prompt_index": prompt_idx,
+                "prompt_id": prompt_record["prompt_id"],
+                "prompt": prompt,
+                "template_name": config.template_name,
+                "max_new_tokens": config.max_new_tokens,
+                "base_response": base_response,
+                "comparison_response": comparison_response,
+            }
+        )
 
         logits_a = _collect_layer_logits(
             wrapper=wrapper_a,
@@ -820,6 +843,11 @@ def run_logitdiff(
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w", encoding="utf-8") as f:
             json.dump(_to_serializable(payload), f, indent=2, ensure_ascii=False)
+    if responses_output_path is not None:
+        responses_path = Path(responses_output_path)
+        responses_path.parent.mkdir(parents=True, exist_ok=True)
+        with responses_path.open("w", encoding="utf-8") as f:
+            json.dump(_to_serializable(response_rows), f, indent=2, ensure_ascii=False)
 
     return payload
 

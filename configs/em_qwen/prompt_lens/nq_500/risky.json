@@ -1,0 +1,23 @@
+{
+  "scenario": "risky_nq_500",
+  "base_model_id": "Qwen/Qwen2.5-7B-Instruct",
+  "comparison_adapter_path": "ModelOrganismsForEM/Qwen2.5-7B-Instruct_risky-financial-advice",
+  "output_root": "tmp/em_qwen/prompt_lens_nq_500/risky",
+  "prompt_lens": {
+    "enabled": true,
+    "dataset_path": "tmp/em_qwen/datasets/nq_train_500_query_only.jsonl",
+    "data_dir": "data",
+    "summaries_dir": "summaries",
+    "figures_dir": "figures",
+    "base_output_stem": "base_qwen_prompt_lens",
+    "comparison_output_stem": "risky_qwen_prompt_lens",
+    "base_reuse_path": "tmp/em_qwen/prompt_lens_nq_500/shared/base_qwen_prompt_lens.pt",
+    "reuse_existing_base": true,
+    "save_logits": false,
+    "dtype": "bfloat16",
+    "trust_remote_code": false,
+    "force_cpu": false,
+    "title_prefix": "Qwen base vs risky-financial adapter on Natural Questions (500 query samples)",
+    "table_label": "tab:qwen_risky_nq_500_prompt_lens"
+  }
+}

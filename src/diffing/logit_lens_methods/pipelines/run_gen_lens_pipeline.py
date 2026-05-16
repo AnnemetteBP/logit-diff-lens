@@ -168,6 +168,32 @@ def _derive_responses_output_path(
     return em_qwen_root / "responses" / scenario / filename
 
 
+def _derive_layerwise_output_path(
+    *,
+    raw: dict[str, Any],
+    output_root: Path,
+    cfg: GenLensConfig,
+) -> Path:
+    scenario = raw.get("scenario")
+    if isinstance(scenario, str) and scenario and "em_qwen" in output_root.parts:
+        filename = f"{scenario}_{cfg.template_name}_t{cfg.max_new_tokens}_layerwise.json"
+        return output_root / filename
+    return (output_root / cfg.data_dir) / f"logitdiff_gen_all_layers_k{cfg.top_k}_t{cfg.max_new_tokens}.json"
+
+
+def _derive_named_manifest_path(
+    *,
+    raw: dict[str, Any],
+    output_root: Path,
+    cfg: GenLensConfig,
+) -> Path | None:
+    scenario = raw.get("scenario")
+    if isinstance(scenario, str) and scenario and "em_qwen" in output_root.parts:
+        filename = f"{scenario}_{cfg.template_name}_t{cfg.max_new_tokens}_manifest.json"
+        return output_root / filename
+    return None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Generic config-driven generation-lens pipeline")
     parser.add_argument("--config", type=Path, required=True)
@@ -194,12 +220,14 @@ def main() -> None:
         raise RuntimeError("gen_lens.enabled=false")
 
     rows = _load_prompt_rows(cfg.prompt_source, cfg.prompt_key)
-    data_dir = output_root / cfg.data_dir
-    summaries_dir = output_root / cfg.summaries_dir
-    figures_dir = output_root / cfg.figures_dir
-    data_dir.mkdir(parents=True, exist_ok=True)
-    summaries_dir.mkdir(parents=True, exist_ok=True)
-    figures_dir.mkdir(parents=True, exist_ok=True)
+    out_path = _derive_layerwise_output_path(raw=raw, output_root=output_root, cfg=cfg)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    if cfg.data_dir and out_path.parent != output_root:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+    if cfg.summaries_dir:
+        (output_root / cfg.summaries_dir).mkdir(parents=True, exist_ok=True)
+    if cfg.figures_dir:
+        (output_root / cfg.figures_dir).mkdir(parents=True, exist_ok=True)
 
     manifest = {
         "config_path": str(args.config),
@@ -213,9 +241,11 @@ def main() -> None:
         "gen_lens": raw["gen_lens"],
     }
     (output_root / "run_manifest.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    named_manifest_path = _derive_named_manifest_path(raw=raw, output_root=output_root, cfg=cfg)
+    if named_manifest_path is not None:
+        named_manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     config = _build_gen_config(rows, cfg, scenario=str(raw.get("scenario", "model_gen_lens")))
-    out_path = data_dir / f"logitdiff_gen_all_layers_k{cfg.top_k}_t{cfg.max_new_tokens}.json"
     run_logitdiff_subprocess_sequential(
         base_model_path=base_model_id,
         comparison_model_path=comparison_model_id,
