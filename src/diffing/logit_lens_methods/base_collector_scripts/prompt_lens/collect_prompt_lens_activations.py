@@ -37,6 +37,18 @@ def _clear_cache() -> None:
         torch.cuda.synchronize()
 
 
+def _extract_final_norm_metadata(module: torch.nn.Module | None) -> dict[str, Any] | None:
+    if module is None:
+        return None
+    weight = getattr(module, "weight", None)
+    bias = getattr(module, "bias", None)
+    return {
+        "weight": weight.detach().to(device="cpu", dtype=torch.float32).clone() if torch.is_tensor(weight) else None,
+        "bias": bias.detach().to(device="cpu", dtype=torch.float32).clone() if torch.is_tensor(bias) else None,
+        "eps": float(getattr(module, "eps", 1e-5)),
+    }
+
+
 def run_collection(
     *,
     dataset_path: Path,
@@ -48,6 +60,7 @@ def run_collection(
     dtype_name: str,
     trust_remote_code: bool,
     force_cpu: bool,
+    save_logits: bool,
     model_key: str = "prompt_lens",
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -98,7 +111,16 @@ def run_collection(
         norm_modes=("raw", "model_norm"),
         collect_components=False,
         project_component_logits=False,
+        save_logits=save_logits,
     )
+
+    lm_head_weight = wrapper.lm_head.weight.detach().to(device="cpu", dtype=torch.float32).clone()
+    final_norm_metadata = _extract_final_norm_metadata(wrapper.final_norm)
+    payload["lm_head_weight"] = lm_head_weight
+    payload["final_norm"] = final_norm_metadata
+    payload["save_logits"] = bool(save_logits)
+
+    torch.save(payload, output_path)
 
     summary = {
         "dataset_path": str(dataset_path),
@@ -110,6 +132,7 @@ def run_collection(
         "dtype": dtype_name,
         "trust_remote_code": trust_remote_code,
         "force_cpu": force_cpu,
+        "save_logits": save_logits,
         "num_rows_completed": int(payload.get("num_rows_completed", 0)),
         "num_examples": int(payload.get("num_examples", 0)),
         "norm_modes": payload.get("norm_modes", []),
@@ -129,6 +152,7 @@ def main() -> None:
     parser.add_argument("--dtype", default="bfloat16")
     parser.add_argument("--trust-remote-code", action="store_true")
     parser.add_argument("--force-cpu", action="store_true")
+    parser.add_argument("--save-logits", action="store_true")
     parser.add_argument("--model-key", default="prompt_lens")
     args = parser.parse_args()
 
@@ -142,6 +166,7 @@ def main() -> None:
         dtype_name=args.dtype,
         trust_remote_code=args.trust_remote_code,
         force_cpu=args.force_cpu,
+        save_logits=args.save_logits,
         model_key=args.model_key,
     )
     print(json.dumps(summary, indent=2))

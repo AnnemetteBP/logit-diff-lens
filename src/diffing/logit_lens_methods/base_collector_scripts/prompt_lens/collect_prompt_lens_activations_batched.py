@@ -29,6 +29,7 @@ class PromptLensActivationCollectorConfig:
     norm_modes: tuple[str, ...] = ("raw", "model_norm")
     collect_components: bool = False
     project_component_logits: bool = False
+    save_logits: bool = True
 
 
 def _detach_full_tensor_to_cpu(tensor: torch.Tensor) -> torch.Tensor:
@@ -100,23 +101,24 @@ def _collect_layer_records(
             "attention_mask": _detach_full_tensor_to_cpu(attention_mask[:, :seq_len]),
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
-        for mode in config.norm_modes:
-            h_norm = normalize_activations(
-                x=hidden_full.clone(),
-                mode=mode,
-                block="embedding",
-                layer_index=-1,
-                model_device=wrapper.model_device,
-                model_dtype=wrapper.model_dtype,
-                final_norm=wrapper.final_norm,
-            )
-            logits, _ = lmhead_project(
-                x=h_norm,
-                lm_head=wrapper.lm_head,
-                stable=wrapper.stable,
-                model_device=wrapper.model_device,
-            )
-            rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
+        if config.save_logits:
+            for mode in config.norm_modes:
+                h_norm = normalize_activations(
+                    x=hidden_full.clone(),
+                    mode=mode,
+                    block="embedding",
+                    layer_index=-1,
+                    model_device=wrapper.model_device,
+                    model_dtype=wrapper.model_dtype,
+                    final_norm=wrapper.final_norm,
+                )
+                logits, _ = lmhead_project(
+                    x=h_norm,
+                    lm_head=wrapper.lm_head,
+                    stable=wrapper.stable,
+                    model_device=wrapper.model_device,
+                )
+                rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
         records.append(rec)
 
     num_blocks = len(wrapper.blocks)
@@ -129,23 +131,24 @@ def _collect_layer_records(
             "attention_mask": _detach_full_tensor_to_cpu(attention_mask[:, :seq_len]),
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
-        for mode in config.norm_modes:
-            h_norm = normalize_activations(
-                x=hidden_full.clone(),
-                mode=mode,
-                block="block",
-                layer_index=idx,
-                model_device=wrapper.model_device,
-                model_dtype=wrapper.model_dtype,
-                final_norm=wrapper.final_norm,
-            )
-            logits, _ = lmhead_project(
-                x=h_norm,
-                lm_head=wrapper.lm_head,
-                stable=wrapper.stable,
-                model_device=wrapper.model_device,
-            )
-            rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
+        if config.save_logits:
+            for mode in config.norm_modes:
+                h_norm = normalize_activations(
+                    x=hidden_full.clone(),
+                    mode=mode,
+                    block="block",
+                    layer_index=idx,
+                    model_device=wrapper.model_device,
+                    model_dtype=wrapper.model_dtype,
+                    final_norm=wrapper.final_norm,
+                )
+                logits, _ = lmhead_project(
+                    x=h_norm,
+                    lm_head=wrapper.lm_head,
+                    stable=wrapper.stable,
+                    model_device=wrapper.model_device,
+                )
+                rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
         if config.collect_components and attention_outputs is not None and idx < len(attention_outputs):
             attn_full = attention_outputs[idx]
             mlp_full = mlp_outputs[idx] if mlp_outputs is not None and idx < len(mlp_outputs) else None
@@ -173,23 +176,24 @@ def _collect_layer_records(
             "attention_mask": _detach_full_tensor_to_cpu(attention_mask[:, :seq_len]),
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
-        for mode in config.norm_modes:
-            h_norm = normalize_activations(
-                x=hidden_full.clone(),
-                mode=mode,
-                block="output",
-                layer_index=out_idx,
-                model_device=wrapper.model_device,
-                model_dtype=wrapper.model_dtype,
-                final_norm=wrapper.final_norm,
-            )
-            logits, _ = lmhead_project(
-                x=h_norm,
-                lm_head=wrapper.lm_head,
-                stable=wrapper.stable,
-                model_device=wrapper.model_device,
-            )
-            rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
+        if config.save_logits:
+            for mode in config.norm_modes:
+                h_norm = normalize_activations(
+                    x=hidden_full.clone(),
+                    mode=mode,
+                    block="output",
+                    layer_index=out_idx,
+                    model_device=wrapper.model_device,
+                    model_dtype=wrapper.model_dtype,
+                    final_norm=wrapper.final_norm,
+                )
+                logits, _ = lmhead_project(
+                    x=h_norm,
+                    lm_head=wrapper.lm_head,
+                    stable=wrapper.stable,
+                    model_device=wrapper.model_device,
+                )
+                rec[f"logits_{mode}"] = _detach_full_tensor_to_cpu(logits)
         records.append(rec)
 
     return records
@@ -330,6 +334,7 @@ def collect_activation_dataset_incremental(
     norm_modes: tuple[str, ...],
     collect_components: bool,
     project_component_logits: bool,
+    save_logits: bool = True,
 ) -> Dict[str, Any]:
     dataset_path = Path(dataset_path)
     rows = [json.loads(line) for line in dataset_path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -347,6 +352,7 @@ def collect_activation_dataset_incremental(
             norm_modes=norm_modes,
             collect_components=collect_components,
             project_component_logits=project_component_logits,
+            save_logits=bool(save_logits),
         )
         item = collect_prompt_lens_activations(wrapper, cfg)
         payload_rows.append(

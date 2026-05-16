@@ -49,6 +49,50 @@ def _l2(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     return torch.linalg.norm(b - a, dim=-1)
 
 
+def _prepare_projection_metadata(payload: dict[str, Any]) -> tuple[torch.Tensor | None, dict[str, Any] | None]:
+    lm_head_weight = payload.get("lm_head_weight")
+    final_norm = payload.get("final_norm")
+    lm_head_tensor = None
+    if torch.is_tensor(lm_head_weight):
+        lm_head_tensor = lm_head_weight.detach().to(device="cpu", dtype=torch.float32)
+    return lm_head_tensor, final_norm if isinstance(final_norm, dict) else None
+
+
+def _apply_saved_final_norm(hidden: torch.Tensor, final_norm: dict[str, Any] | None) -> torch.Tensor:
+    if final_norm is None:
+        return hidden
+    eps = float(final_norm.get("eps", 1e-5))
+    mean = hidden.mean(dim=-1, keepdim=True)
+    var = hidden.var(dim=-1, keepdim=True, unbiased=False)
+    out = (hidden - mean) / torch.sqrt(var + eps)
+    weight = final_norm.get("weight")
+    bias = final_norm.get("bias")
+    if torch.is_tensor(weight):
+        out = out * weight.detach().to(device="cpu", dtype=torch.float32)
+    if torch.is_tensor(bias):
+        out = out + bias.detach().to(device="cpu", dtype=torch.float32)
+    return out
+
+
+def _resolve_logits(
+    rec: dict[str, Any],
+    *,
+    mode: str,
+    usable: int,
+    lm_head_weight: torch.Tensor | None,
+    final_norm: dict[str, Any] | None,
+) -> torch.Tensor:
+    direct = rec.get(f"logits_{mode}")
+    if torch.is_tensor(direct):
+        return direct[0, :usable, :].float()
+    if lm_head_weight is None:
+        raise ValueError(f"Missing persisted logits_{mode} and lm_head_weight needed for projection")
+    hidden = rec["hidden"][0, :usable, :].float()
+    if mode == "model_norm":
+        hidden = _apply_saved_final_norm(hidden, final_norm)
+    return hidden @ lm_head_weight.T
+
+
 def _row_key(row: dict[str, Any]) -> tuple[str, str]:
     return str(row.get("group_id")), str(row.get("variant"))
 
@@ -75,6 +119,8 @@ def summarize_mode_specific(
 ) -> dict[str, Any]:
     base_payload = torch.load(Path(base_path), map_location="cpu")
     comparison_payload = torch.load(Path(comparison_path), map_location="cpu")
+    base_lm_head_weight, base_final_norm = _prepare_projection_metadata(base_payload)
+    comparison_lm_head_weight, comparison_final_norm = _prepare_projection_metadata(comparison_payload)
     base_rows = {_row_key(row): row for row in base_payload["rows"]}
     comparison_rows = {_row_key(row): row for row in comparison_payload["rows"]}
     if set(base_rows) != set(comparison_rows):
@@ -124,8 +170,20 @@ def summarize_mode_specific(
             hidden_metric_values["hidden_l2"][layer].extend(_l2(h_a, h_b).tolist())
 
             for mode in modes:
-                logits_a = rec_a[f"logits_{mode}"][0, :usable, :].float()
-                logits_b = rec_b[f"logits_{mode}"][0, :usable, :].float()
+                logits_a = _resolve_logits(
+                    rec_a,
+                    mode=mode,
+                    usable=usable,
+                    lm_head_weight=base_lm_head_weight,
+                    final_norm=base_final_norm,
+                )
+                logits_b = _resolve_logits(
+                    rec_b,
+                    mode=mode,
+                    usable=usable,
+                    lm_head_weight=comparison_lm_head_weight,
+                    final_norm=comparison_final_norm,
+                )
                 probs_a = _softmax(logits_a)
                 probs_b = _softmax(logits_b)
 
