@@ -106,6 +106,8 @@ class StreamingPromptComparisonConfig:
         "logit_cosine",
         "top1_agreement",
         "topk_jaccard",
+        "tvd",
+        "js_divergence",
     )
 
 
@@ -138,6 +140,8 @@ def _parse_streaming_config(raw: dict[str, Any]) -> StreamingPromptComparisonCon
             "logit_cosine",
             "top1_agreement",
             "topk_jaccard",
+            "tvd",
+            "js_divergence",
         ])),
     )
 
@@ -234,7 +238,7 @@ def _vector_cosine(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     return numer / denom
 
 
-def _mean_topk_jaccard(logits_a: torch.Tensor, logits_b: torch.Tensor, top_k: int) -> float:
+def _topk_jaccard_values(logits_a: torch.Tensor, logits_b: torch.Tensor, top_k: int) -> list[float]:
     topk_a = logits_a.topk(top_k, dim=-1).indices
     topk_b = logits_b.topk(top_k, dim=-1).indices
     scores: list[float] = []
@@ -246,7 +250,32 @@ def _mean_topk_jaccard(logits_a: torch.Tensor, logits_b: torch.Tensor, top_k: in
             scores.append(1.0)
         else:
             scores.append(len(set_a & set_b) / len(union))
-    return float(np.mean(scores)) if scores else 0.0
+    return scores
+
+
+def _probabilities(logits: torch.Tensor) -> torch.Tensor:
+    return torch.softmax(logits.float(), dim=-1)
+
+
+def _tvd_values(logits_a: torch.Tensor, logits_b: torch.Tensor) -> list[float]:
+    probs_a = _probabilities(logits_a)
+    probs_b = _probabilities(logits_b)
+    tvd = 0.5 * torch.abs(probs_a - probs_b).sum(dim=-1)
+    return [float(v) for v in tvd.tolist()]
+
+
+def _js_divergence_values(logits_a: torch.Tensor, logits_b: torch.Tensor) -> list[float]:
+    probs_a = _probabilities(logits_a)
+    probs_b = _probabilities(logits_b)
+    mean_probs = 0.5 * (probs_a + probs_b)
+    eps = 1e-12
+    probs_a = probs_a.clamp_min(eps)
+    probs_b = probs_b.clamp_min(eps)
+    mean_probs = mean_probs.clamp_min(eps)
+    kl_a = (probs_a * (torch.log(probs_a) - torch.log(mean_probs))).sum(dim=-1)
+    kl_b = (probs_b * (torch.log(probs_b) - torch.log(mean_probs))).sum(dim=-1)
+    js = 0.5 * (kl_a + kl_b)
+    return [float(v) for v in js.tolist()]
 
 
 def _compute_sample_metrics(
@@ -257,24 +286,28 @@ def _compute_sample_metrics(
     top_k: int,
     metric_names: Sequence[str],
 ) -> dict[int, dict[str, float]]:
-    metrics_by_layer: dict[int, dict[str, float]] = {}
+    metrics_by_layer: dict[int, dict[str, list[float]]] = {}
     for layer_idx in layer_indices:
         base_hidden = base_payload[layer_idx]["hidden"][0]
         cmp_hidden = comparison_payload[layer_idx]["hidden"][0]
         base_logits = base_payload[layer_idx]["logits"][0]
         cmp_logits = comparison_payload[layer_idx]["logits"][0]
 
-        layer_metrics: dict[str, float] = {}
+        layer_metrics: dict[str, list[float]] = {}
         if "hidden_cosine" in metric_names:
-            layer_metrics["hidden_cosine"] = float(_vector_cosine(base_hidden, cmp_hidden).mean().item())
+            layer_metrics["hidden_cosine"] = [float(v) for v in _vector_cosine(base_hidden, cmp_hidden).tolist()]
         if "logit_cosine" in metric_names:
-            layer_metrics["logit_cosine"] = float(_vector_cosine(base_logits, cmp_logits).mean().item())
+            layer_metrics["logit_cosine"] = [float(v) for v in _vector_cosine(base_logits, cmp_logits).tolist()]
         if "top1_agreement" in metric_names:
             top1_a = base_logits.argmax(dim=-1)
             top1_b = cmp_logits.argmax(dim=-1)
-            layer_metrics["top1_agreement"] = float((top1_a == top1_b).float().mean().item())
+            layer_metrics["top1_agreement"] = [float(v) for v in (top1_a == top1_b).float().tolist()]
         if "topk_jaccard" in metric_names:
-            layer_metrics["topk_jaccard"] = _mean_topk_jaccard(base_logits, cmp_logits, top_k)
+            layer_metrics["topk_jaccard"] = _topk_jaccard_values(base_logits, cmp_logits, top_k)
+        if "tvd" in metric_names:
+            layer_metrics["tvd"] = _tvd_values(base_logits, cmp_logits)
+        if "js_divergence" in metric_names:
+            layer_metrics["js_divergence"] = _js_divergence_values(base_logits, cmp_logits)
         metrics_by_layer[layer_idx] = layer_metrics
     return metrics_by_layer
 
@@ -302,10 +335,6 @@ def _fisher_ci(corr: float, n: int) -> list[float]:
     return [float(np.tanh(z_low)), float(np.tanh(z_high))]
 
 
-def _safe_rankdata(values: Sequence[float]) -> np.ndarray:
-    return stats.rankdata(np.asarray(values, dtype=float))
-
-
 def _compute_layer_summaries(
     sample_metrics: list[dict[str, Any]],
     *,
@@ -319,11 +348,12 @@ def _compute_layer_summaries(
         for metric_name in metric_names:
             summary[norm_mode][metric_name] = {}
             for layer_idx in layer_indices:
-                values = [
-                    float(row["metrics"][norm_mode][str(layer_idx)][metric_name])
-                    for row in sample_metrics
-                    if metric_name in row["metrics"][norm_mode][str(layer_idx)]
-                ]
+                values: list[float] = []
+                for row in sample_metrics:
+                    metric_values = row["metrics"][norm_mode][str(layer_idx)].get(metric_name)
+                    if metric_values is None:
+                        continue
+                    values.extend(float(v) for v in metric_values)
                 arr = np.asarray(values, dtype=float)
                 summary[norm_mode][metric_name][str(layer_idx)] = {
                     "n": int(arr.size),
@@ -350,24 +380,22 @@ def _compute_correlations(
         correlations[norm_mode] = {}
         for metric_name in metric_names:
             correlations[norm_mode][metric_name] = {}
-            final_values = np.asarray(
-                [
-                    float(row["metrics"][norm_mode][final_layer][metric_name])
-                    for row in sample_metrics
-                    if metric_name in row["metrics"][norm_mode][final_layer]
-                ],
-                dtype=float,
-            )
             for layer_idx in layer_indices[:-1]:
                 layer_key = str(layer_idx)
-                values = np.asarray(
-                    [
-                        float(row["metrics"][norm_mode][layer_key][metric_name])
-                        for row in sample_metrics
-                        if metric_name in row["metrics"][norm_mode][layer_key]
-                    ],
-                    dtype=float,
-                )
+                paired_values: list[float] = []
+                paired_final_values: list[float] = []
+                for row in sample_metrics:
+                    metric_values = row["metrics"][norm_mode][layer_key].get(metric_name)
+                    final_metric_values = row["metrics"][norm_mode][final_layer].get(metric_name)
+                    if metric_values is None or final_metric_values is None:
+                        continue
+                    usable = min(len(metric_values), len(final_metric_values))
+                    if usable <= 0:
+                        continue
+                    paired_values.extend(float(v) for v in metric_values[:usable])
+                    paired_final_values.extend(float(v) for v in final_metric_values[:usable])
+                values = np.asarray(paired_values, dtype=float)
+                final_values = np.asarray(paired_final_values, dtype=float)
                 if values.size != final_values.size or values.size < 3:
                     correlations[norm_mode][metric_name][layer_key] = {
                         "n": int(min(values.size, final_values.size)),
@@ -377,9 +405,7 @@ def _compute_correlations(
                     continue
 
                 pearson_r, pearson_p = stats.pearsonr(values, final_values)
-                ranked_a = _safe_rankdata(values)
-                ranked_b = _safe_rankdata(final_values)
-                spearman_r, spearman_p = stats.pearsonr(ranked_a, ranked_b)
+                spearman_r, spearman_p = stats.spearmanr(values, final_values)
                 correlations[norm_mode][metric_name][layer_key] = {
                     "n": int(values.size),
                     "pearson": {
