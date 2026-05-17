@@ -1,0 +1,20 @@
+{
+  "EleutherAI/pythia-160m-deduped@step1000": "160M-1k First",
+  "EleutherAI/pythia-160m-deduped@step71000": "160M-71k Mid",
+  "EleutherAI/pythia-160m-deduped@step143000": "160M-143k Base",
+  "EleutherAI/pythia-410m-deduped@step1000": "410M-1k First",
+  "EleutherAI/pythia-410m-deduped@step71000": "410M-71k Mid",
+  "EleutherAI/pythia-410m-deduped@step143000": "410M-143k Base",
+  "EleutherAI/pythia-1.4b-deduped@step1000": "1.4B-1k First",
+  "EleutherAI/pythia-1.4b-deduped@step71000": "1.4B-71k Mid",
+  "EleutherAI/pythia-1.4b-deduped@step143000": "1.4B-143k Base",
+  "EleutherAI/pythia-2.8b-deduped@step1000": "2.8B-1k First",
+  "EleutherAI/pythia-2.8b-deduped@step71000": "2.8B-71k Mid",
+  "EleutherAI/pythia-2.8b-deduped@step143000": "2.8B-143k Base",
+  "EleutherAI/pythia-6.9b-deduped@step1000": "6.9B-1k First",
+  "EleutherAI/pythia-6.9b-deduped@step71000": "6.9B-71k Mid",
+  "EleutherAI/pythia-6.9b-deduped@step143000": "6.9B-143k Base",
+  "EleutherAI/pythia-12b-deduped@step1000": "12B-1k First",
+  "EleutherAI/pythia-12b-deduped@step71000": "12B-71k Mid",
+  "EleutherAI/pythia-12b-deduped@step143000": "12B-143k Base"
+}

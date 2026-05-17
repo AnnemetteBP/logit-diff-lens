@@ -8,15 +8,23 @@ from transformers import AutoTokenizer, PreTrainedTokenizerBase, PreTrainedToken
 _TOKENIZER_CACHE: dict[str, PreTrainedTokenizerBase] = {}
 
 
-def load_tokenizer(model_name: str, chat_template: str | None = None) -> PreTrainedTokenizerBase:
-    if model_name in _TOKENIZER_CACHE:
-        tokenizer = _TOKENIZER_CACHE[model_name]
+def load_tokenizer(
+    model_name: str,
+    chat_template: str | None = None,
+    revision: str | None = None,
+) -> PreTrainedTokenizerBase:
+    cache_key = f"{model_name}@{revision}" if revision else model_name
+    if cache_key in _TOKENIZER_CACHE:
+        tokenizer = _TOKENIZER_CACHE[cache_key]
         if chat_template is not None:
             tokenizer.chat_template = chat_template
         return tokenizer
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        kwargs = {}
+        if revision is not None:
+            kwargs["revision"] = revision
+        tokenizer = AutoTokenizer.from_pretrained(model_name, **kwargs)
     except AttributeError as e:
         model_path = Path(model_name)
         tokenizer_json = model_path / "tokenizer.json"
@@ -43,5 +51,5 @@ def load_tokenizer(model_name: str, chat_template: str | None = None) -> PreTrai
     if chat_template is not None:
         tokenizer.chat_template = chat_template
 
-    _TOKENIZER_CACHE[model_name] = tokenizer
+    _TOKENIZER_CACHE[cache_key] = tokenizer
     return tokenizer

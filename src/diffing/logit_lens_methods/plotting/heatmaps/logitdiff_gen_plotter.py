@@ -756,15 +756,18 @@ def plot_logitdiff_jaccard_heatmap(
     left_margin = max(130, min(220, 85 + max_y_label_len * 4))
     right_margin = 110 if show_marginals else 120
     base_bottom_margin = max(130, min(180, 82 + max_x_label_len * 3))
+    top_label_max_len = max((len(label) for label in (data["x_labels_secondary"] or [])), default=0)
+    top_tick_font_size = 34 if top_label_max_len <= 16 else 32 if top_label_max_len <= 24 else 30
+    top_axis_title_font_size = 32 if top_label_max_len <= 16 else 30 if top_label_max_len <= 24 else 28
     if layout_scale == "top1":
         bottom_margin = base_bottom_margin + 72
-        top_margin = 220 if data["x_labels_secondary"] is not None else 162
+        top_margin = 280 if data["x_labels_secondary"] is not None else 190
     elif layout_scale == "top5":
         bottom_margin = base_bottom_margin + 60
-        top_margin = 226 if data["x_labels_secondary"] is not None else 168
+        top_margin = 292 if data["x_labels_secondary"] is not None else 198
     else:
         bottom_margin = base_bottom_margin + 60
-        top_margin = 230 if data["x_labels_secondary"] is not None else 172
+        top_margin = 306 if data["x_labels_secondary"] is not None else 206
     width = max(960, left_margin + right_margin + num_positions * cell_w + (170 if show_marginals else 0))
     extra_height = 46 if layout_scale == "top1" else (38 if layout_scale == "top5" else 30)
     height = max(420, top_margin + bottom_margin + num_layers * cell_h + (90 if show_marginals else 0) + extra_height)
@@ -931,7 +934,7 @@ def plot_logitdiff_jaccard_heatmap(
                 "ticktext": data["x_labels_secondary"],
                 "tickangle": 32,
                 "tickfont": {
-                    "size": 32,
+                    "size": top_tick_font_size,
                     "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
                 },
                 "range": [-0.5, num_positions - 0.5],
@@ -955,20 +958,34 @@ def plot_logitdiff_jaccard_heatmap(
     model_b_fallback = _compact_model_label(model_b_label or model_meta.get("finetuned_model_name"), "Finetuned")
     model_b_label = _finetuned_display_label(model_meta, model_b_fallback)
     prompt_title = _display_prompt_text(data["prompt"])
-    display_title = title or f"{model_a_label} <> {model_b_label}"
-    subtitle_k = data.get("comparison_k") or model_meta.get("top_k", "?")
-    display_subtitle = f"{prompt_title} | Top-{subtitle_k} Jaccard (IoU)"
+    if title is not None:
+        full_title_text = title
+    else:
+        subtitle_k = data.get("comparison_k") or model_meta.get("top_k", "?")
+        full_title_text = f"{model_a_label} <> {model_b_label} | {prompt_title} | Top-{subtitle_k} Jaccard (IoU)"
+    if width >= 12000:
+        title_font_size = 42 if len(full_title_text) <= 160 else 40 if len(full_title_text) <= 220 else 38
+    elif width >= 9000:
+        title_font_size = 40 if len(full_title_text) <= 160 else 38 if len(full_title_text) <= 220 else 36
+    else:
+        title_font_size = 38 if len(full_title_text) <= 140 else 36 if len(full_title_text) <= 200 else 34
+    title_y = 0.99
+    secondary_title_standoff = 0
+    if data["x_labels_secondary"] is not None:
+        title_gap_pixels = 0 if layout_scale == "top5" else 2
+        adaptive_top_margin = 118 + top_tick_font_size + top_axis_title_font_size + title_font_size + title_gap_pixels
+        top_margin = max(top_margin, adaptive_top_margin)
 
     fig.update_layout(
         title={
-            "text": f"<b>{display_title} | {display_subtitle}</b>",
+            "text": f"<span style='font-weight:600'>{full_title_text}</span>",
             "x": 0.5,
             "xanchor": "center",
-            "y": 0.978 if layout_scale != "top10" else 0.992,
+            "y": title_y,
             "yanchor": "top",
             "font": {
                 "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
-                "size": 36,
+                "size": title_font_size,
                 "color": "black",
             },
         },
@@ -1035,13 +1052,17 @@ def plot_logitdiff_jaccard_heatmap(
         fig.update_layout(
             xaxis2={
                 **fig.layout.xaxis2.to_plotly_json(),
+                "tickfont": {
+                    "size": top_tick_font_size,
+                    "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                },
                 "title": {
                     "text": secondary_x_title,
                     "font": {
-                        "size": 34,
+                        "size": top_axis_title_font_size,
                         "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
                     },
-                    "standoff": 8 if layout_scale == "top1" else (6 if medium_topk_layout else 6),
+                    "standoff": secondary_title_standoff,
                 },
             }
         )

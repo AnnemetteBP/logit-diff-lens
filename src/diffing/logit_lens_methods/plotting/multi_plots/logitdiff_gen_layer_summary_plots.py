@@ -23,6 +23,48 @@ def _label_from_metadata(metadata: dict[str, Any]) -> str:
     return mapping.get(template_name, str(template_name).replace("_", " ").title())
 
 
+def _load_model_name_map(path: str | Path) -> dict[str, str]:
+    with Path(path).open("r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def _canonical_model_ref(value: str | None) -> str | None:
+    if not value:
+        return None
+    text = str(value)
+    marker = "models--"
+    if marker in text:
+        after = text.split(marker, 1)[1]
+        repo_part = after.split("/snapshots/", 1)[0].split("/refs/", 1)[0].strip("/")
+        pieces = repo_part.split("--", 1)
+        if len(pieces) == 2:
+            return f"{pieces[0]}/{pieces[1]}"
+    if text.startswith("ModelOrganismsForEM/") or text.startswith("Qwen/"):
+        return text
+    return None
+
+
+def _model_label_from_payload(payload: dict[str, Any], model_name_map: dict[str, str]) -> str:
+    metadata = payload.get("metadata", {})
+    candidates = [
+        _canonical_model_ref(metadata.get("adapter_path")),
+        _canonical_model_ref(metadata.get("finetuned_model_name")),
+    ]
+    for candidate in candidates:
+        if candidate and candidate in model_name_map:
+            return model_name_map[candidate]
+    scenario = metadata.get("scenario")
+    if isinstance(scenario, str):
+        fallback = {
+            "risky": "Risky Financial Advice",
+            "medical": "Bad Medical Advice",
+            "sports": "Extreme Sports",
+        }
+        if scenario in fallback:
+            return fallback[scenario]
+    return "Comparison model"
+
+
 def summarize_generation_jaccard_by_layer(
     payload_or_path: str | Path | dict[str, Any],
     *,
@@ -175,3 +217,114 @@ def save_generation_template_layer_summary_plot(
         )
 
     return {"summaries": summaries, "figure_path": str(output_path)}
+
+
+def save_generation_model_jaccard_row_plot(
+    payloads_or_paths: list[str | Path | dict[str, Any]],
+    *,
+    output_path: str | Path,
+    model_name_map_path: str | Path,
+    summary_output_path: str | Path | None = None,
+    generated_only: bool = True,
+) -> dict[str, Any]:
+    model_name_map = _load_model_name_map(model_name_map_path)
+    base_label = model_name_map.get("Qwen/Qwen2.5-7B-Instruct", "Base model")
+    payloads = [
+        _load_payload(p) if isinstance(p, (str, Path)) else p
+        for p in payloads_or_paths
+    ]
+    summaries = [
+        summarize_generation_jaccard_by_layer(payload, generated_only=generated_only)
+        for payload in payloads
+    ]
+    labels = [_model_label_from_payload(payload, model_name_map) for payload in payloads]
+
+    fig, axes = plt.subplots(1, len(summaries), figsize=(6.8 * len(summaries), 5.0), sharey=True)
+    if len(summaries) == 1:
+        axes = [axes]
+
+    colors = {
+        "top1": "#d1495b",
+        "top5": "#2a9d8f",
+        "top10": "#1d3557",
+    }
+    markers = {
+        "top1": "o",
+        "top5": "s",
+        "top10": "^",
+    }
+    line_labels = {
+        "top1": "Jaccard@1",
+        "top5": "Jaccard@5",
+        "top10": "Jaccard@10",
+    }
+
+    for ax, summary, label in zip(axes, summaries, labels):
+        x = [row["layer_absolute"] for row in summary["layers"]]
+        curves = {
+            "top1": [row["top1_mean"] for row in summary["layers"]],
+            "top5": [row["top5_mean"] for row in summary["layers"]],
+            "top10": [row["top10_mean"] for row in summary["layers"]],
+        }
+        for key in ("top1", "top5", "top10"):
+            ax.plot(
+                x,
+                curves[key],
+                label=line_labels[key],
+                color=colors[key],
+                linewidth=2.4,
+                marker=markers[key],
+                markersize=5.7,
+                markeredgewidth=0,
+            )
+        ax.set_title(label, fontsize=15.5, fontweight="semibold")
+        ax.set_xlabel("Layer", fontsize=12.5, fontweight="semibold")
+        ax.grid(True, alpha=0.25)
+        tick_positions = x[::2] if len(x) > 14 else list(x)
+        if x and x[-1] not in tick_positions:
+            tick_positions = list(tick_positions) + [x[-1]]
+        ax.set_xticks(tick_positions)
+        tick_labels = [str(v) for v in tick_positions]
+        if tick_positions:
+            tick_labels[-1] = "Last"
+        ax.set_xticklabels(tick_labels)
+        ax.tick_params(axis="x", labelsize=9.5, rotation=36)
+        ax.tick_params(axis="y", labelsize=10)
+        ax.set_ylim(0.0, 1.0)
+
+    axes[0].set_ylabel("Mean Jaccard overlap", fontsize=12.5, fontweight="semibold")
+    handles, legend_labels = axes[0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        legend_labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.945),
+        ncol=3,
+        frameon=False,
+        fontsize=14.5,
+        prop={"weight": "semibold", "size": 14.5},
+    )
+    fig.suptitle(
+        f"Gen LogitDiff Lens: Jaccard overlap between Base {base_label} & FT models",
+        fontsize=18,
+        fontweight="bold",
+        y=0.97,
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.935), w_pad=0.85)
+
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+    payload = {
+        "title": f"Gen LogitDiff Lens: Jaccard overlap between Base {base_label} & FT models",
+        "labels": labels,
+        "summaries": summaries,
+        "figure_path": str(output_path),
+    }
+    if summary_output_path is not None:
+        summary_output_path = Path(summary_output_path)
+        summary_output_path.parent.mkdir(parents=True, exist_ok=True)
+        summary_output_path.write_text(json.dumps(payload, indent=2, ensure_ascii=False), encoding="utf-8")
+    return payload
