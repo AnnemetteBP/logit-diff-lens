@@ -11,6 +11,7 @@
 tmp/
 
 ucloud/
+ucloud_results/
 
 Qwen/
 ModelOrganismsForEM/
