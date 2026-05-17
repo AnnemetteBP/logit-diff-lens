@@ -1,6 +1,5 @@
 from typing import Any, Tuple, List, Dict
 from collections import OrderedDict
-from peft import config
 import torch
 from transformers import PreTrainedTokenizerBase, PreTrainedModel
 
@@ -76,6 +75,71 @@ class PatchingLensWrapper(BaseLensWrapper):
 
 
     # -----------------------
+    # Patch config helpers
+    # -----------------------
+    def set_patch_config(self, patch_config: Dict | None) -> None:
+        self.patch_config = patch_config
+
+
+    def clear_patch_config(self) -> None:
+        self.patch_config = None
+
+
+    def _normalize_index(self, index: Any) -> Any:
+        if index is None:
+            return slice(None)
+        if isinstance(index, range):
+            return list(index)
+        if torch.is_tensor(index):
+            return index.tolist()
+        return index
+
+
+    def _apply_patch(self, hidden: torch.Tensor, layer_idx: int) -> torch.Tensor:
+        if self.patch_config is None:
+            return hidden
+
+        patch_layer_idx = self.patch_config.get("layer_idx")
+        if patch_layer_idx != layer_idx:
+            return hidden
+
+        mode = self.patch_config.get("mode", "replace")
+        alpha = float(self.patch_config.get("alpha", 1.0))
+        batch_idx = self._normalize_index(self.patch_config.get("batch_idx"))
+        token_idx = self._normalize_index(self.patch_config.get("token_idx"))
+        feature_idx = self._normalize_index(self.patch_config.get("feature_idx"))
+
+        patch = self.patch_config.get("tensor")
+        if patch is None:
+            raise ValueError("patch_config requires a 'tensor' entry")
+        if not torch.is_tensor(patch):
+            raise TypeError(f"patch_config['tensor'] must be a tensor, got {type(patch)}")
+
+        patched = hidden.clone()
+        target = patched[batch_idx, token_idx, feature_idx]
+
+        patch = patch.to(device=target.device, dtype=target.dtype)
+
+        if patch.shape != target.shape:
+            try:
+                patch = torch.broadcast_to(patch, target.shape)
+            except RuntimeError as exc:
+                raise ValueError(
+                    f"Patch tensor shape {tuple(patch.shape)} is not compatible with "
+                    f"target slice shape {tuple(target.shape)}"
+                ) from exc
+
+        if mode == "add":
+            patched[batch_idx, token_idx, feature_idx] = target + alpha * patch
+        elif mode == "replace":
+            patched[batch_idx, token_idx, feature_idx] = patch
+        else:
+            raise ValueError(f"Unsupported patch mode: {mode}")
+
+        return patched
+
+
+    # -----------------------
     # Hooks
     # -----------------------
     def save_to_fp32(self, x:torch.Tensor) -> torch.Tensor:
@@ -97,21 +161,8 @@ class PatchingLensWrapper(BaseLensWrapper):
 
             h = t
 
-            # ---------------------------
-            # PATCH (FIX)
-            # ---------------------------
-            if self.patch_config is not None:
-                if self.patch_config["layer_idx"] == layer_idx:
-
-                    patch = self.patch_config["tensor"]
-
-                    patch = patch.to(h.device).to(h.dtype)
-
-                    if self.patch_config["mode"] == "add":
-                        h = h + self.patch_config["alpha"] * patch
-
-                    elif self.patch_config["mode"] == "replace":
-                        h = patch
+            # Apply the configured patch to the selected layer/token slice.
+            h = self._apply_patch(h, layer_idx)
 
             # ---------------------------
             # SAVE

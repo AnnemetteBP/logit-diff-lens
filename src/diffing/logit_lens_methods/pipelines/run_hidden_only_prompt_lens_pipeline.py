@@ -25,12 +25,20 @@ class UCloudPromptLensConfig:
     dataset_path: Path
     dtype: str = "bfloat16"
     trust_remote_code: bool = False
+    force_cpu: bool = False
+    base_model_revision: str | None = None
+    comparison_model_revision: str | None = None
+    base_tokenizer_revision: str | None = None
+    comparison_tokenizer_revision: str | None = None
     data_dir: str = "data"
     summaries_dir: str = "summaries"
     figures_dir: str = "figures"
     base_output_stem: str = "base_qwen_prompt_lens"
     comparison_output_stem: str = "comparison_qwen_prompt_lens"
     base_reuse_path: Path | None = None
+    reuse_existing_base: bool = True
+    quantization_config_name: str | None = None
+    quantization_config_source: str | None = None
     title_prefix: str = "Model comparison"
     table_label: str = "tab:prompt_lens_summary"
     enabled: bool = True
@@ -48,12 +56,20 @@ def _parse_config(raw: dict[str, Any]) -> UCloudPromptLensConfig:
         dataset_path=Path(cfg["dataset_path"]),
         dtype=cfg.get("dtype", "bfloat16"),
         trust_remote_code=bool(cfg.get("trust_remote_code", False)),
+        force_cpu=bool(cfg.get("force_cpu", False)),
+        base_model_revision=raw.get("base_model_revision"),
+        comparison_model_revision=raw.get("comparison_model_revision"),
+        base_tokenizer_revision=raw.get("base_tokenizer_revision"),
+        comparison_tokenizer_revision=raw.get("comparison_tokenizer_revision"),
         data_dir=cfg.get("data_dir", "data"),
         summaries_dir=cfg.get("summaries_dir", "summaries"),
         figures_dir=cfg.get("figures_dir", "figures"),
         base_output_stem=cfg.get("base_output_stem", "base_qwen_prompt_lens"),
         comparison_output_stem=cfg.get("comparison_output_stem", "comparison_qwen_prompt_lens"),
         base_reuse_path=Path(base_reuse_path) if base_reuse_path else None,
+        reuse_existing_base=bool(cfg.get("reuse_existing_base", True)),
+        quantization_config_name=raw.get("quantization_config_name"),
+        quantization_config_source=raw.get("quantization_config_source"),
         title_prefix=cfg.get("title_prefix", "Model comparison"),
         table_label=cfg.get("table_label", "tab:prompt_lens_summary"),
         enabled=bool(cfg.get("enabled", True)),
@@ -401,19 +417,24 @@ def main() -> None:
     figures_dir.mkdir(parents=True, exist_ok=True)
 
     base_payload_path = cfg.base_reuse_path or (data_dir / f"{cfg.base_output_stem}.pt")
-    if not base_payload_path.exists():
+    reused_existing_base = cfg.reuse_existing_base and base_payload_path.exists()
+    if not reused_existing_base:
         base_payload_path.parent.mkdir(parents=True, exist_ok=True)
         run_collection(
             dataset_path=cfg.dataset_path,
             output_dir=base_payload_path.parent,
             output_stem=base_payload_path.stem,
             model_id=base_model_id,
+            model_revision=cfg.base_model_revision,
             adapter_path=None,
             tokenizer_id=tokenizer_id,
+            tokenizer_revision=cfg.base_tokenizer_revision,
             dtype_name=cfg.dtype,
             trust_remote_code=cfg.trust_remote_code,
-            force_cpu=False,
+            force_cpu=cfg.force_cpu,
             save_logits=False,
+            quantization_config_name=None,
+            quantization_config_source=None,
         )
 
     run_collection(
@@ -421,12 +442,16 @@ def main() -> None:
         output_dir=data_dir,
         output_stem=cfg.comparison_output_stem,
         model_id=comparison_model_id,
+        model_revision=cfg.comparison_model_revision,
         adapter_path=comparison_adapter_path,
         tokenizer_id=tokenizer_id,
+        tokenizer_revision=cfg.comparison_tokenizer_revision,
         dtype_name=cfg.dtype,
         trust_remote_code=cfg.trust_remote_code,
-        force_cpu=False,
+        force_cpu=cfg.force_cpu,
         save_logits=False,
+        quantization_config_name=cfg.quantization_config_name,
+        quantization_config_source=cfg.quantization_config_source,
     )
 
     comparison_payload_path = data_dir / f"{cfg.comparison_output_stem}.pt"
@@ -454,6 +479,10 @@ def main() -> None:
         "comparison_model_id": comparison_model_id,
         "comparison_adapter_path": comparison_adapter_path,
         "tokenizer_id": tokenizer_id,
+        "base_model_revision": cfg.base_model_revision,
+        "comparison_model_revision": cfg.comparison_model_revision,
+        "base_tokenizer_revision": cfg.base_tokenizer_revision,
+        "comparison_tokenizer_revision": cfg.comparison_tokenizer_revision,
         "output_root": str(output_root),
         "dataset_path": str(cfg.dataset_path),
         "base_payload_path": str(base_payload_path),
@@ -461,8 +490,10 @@ def main() -> None:
         "summary_json": str(summaries_dir / "mode_specific_summary.json"),
         "figures_dir": str(figures_dir),
         "save_logits": False,
-        "force_cpu": False,
-        "reused_existing_base": base_payload_path.exists(),
+        "force_cpu": cfg.force_cpu,
+        "reused_existing_base": reused_existing_base,
+        "quantization_config_name": cfg.quantization_config_name,
+        "quantization_config_source": cfg.quantization_config_source,
         "summary_keys": list(summary.keys()),
         "derived_outputs": derived_outputs,
     }

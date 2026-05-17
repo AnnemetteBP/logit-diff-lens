@@ -1,0 +1,86 @@
+Broadly, the three cases tell different stories.
+
+Qwen finetunes
+The finetuned Qwen models are very close to base in hidden space: cosine stays around 0.997-0.998 through most layers, with larger L2 only toward the last layer. So the representation drift is subtle, not a wholesale rewrite.
+
+The logit-side differences are also mostly small through early/mid layers, then become more visible at the last layer. Raw JSD/TVD and Jaccard degradation are strongest at Last, which suggests the behavioral difference is concentrated near final readout rather than distributed evenly through the whole stack. Model-norm makes the layer trend smoother and shows accuracy rising late, as expected.
+
+Quantized Llama
+This is the clearest “severity ladder”:
+
+8-bit is close to base.
+4-bit is further but still structurally similar.
+HF1Bit is qualitatively much more distorted.
+
+Hidden cosine and L2 show that directly: 8-bit remains high-cosine / low-L2, 4-bit worsens, HF1Bit has much lower cosine and much larger L2. Logit metrics follow the same pattern: TVD/JSD are small for 8-bit, larger for 4-bit, and huge for HF1Bit. Jaccard@k collapses especially for HF1Bit.
+
+Layerwise, quantization errors tend to grow toward later layers, especially in raw lens. That means small perturbations early become more behaviorally consequential closer to output.
+
+Pythia training dynamics
+Pythia shows the strongest developmental signal.
+
+Early checkpoints, 1k, are far from the final step143000 model across hidden and logit metrics. Mid checkpoints, 71k, are consistently closer to final than 1k, especially in larger models.
+
+The larger Pythia models show a more interpretable depth progression: early/mid layers can already partially align, but late layers and last-layer behavior distinguish training stage strongly. In the mid checkpoint, larger models like 6.9B and 12B have much lower TVD/JSD and higher Jaccard than their 1k versions, suggesting they have moved much closer to the final model’s next-token geometry.
+
+The base/comp accuracy rows also make sense: final/reference-side accuracy rises strongly late; early checkpoints have weaker late-layer accuracy, while 71k checkpoints look much closer.
+
+Correlation Tables
+The correlations mostly answer: “which intermediate layers already predict the last-layer behavior?”
+
+High correlations near Layer/Last close to the final layer mean the metric has stabilized late in the network. For smooth metrics like hidden L2/cosine, strongest correlations are often near the last layer. For discrete metrics like Jaccard or accuracy, correlations can be noisier or undefined when values are constant.
+
+So the overall picture is:
+
+Qwen finetuning: small, late-concentrated behavioral drift.
+Llama quantization: monotonic degradation by quantization severity, strongest for HF1Bit.
+Pythia training: early checkpoints are genuinely different systems; mid checkpoints become increasingly final-like, especially in larger models and later layers.
+
+
+
+
+9:20 PM
+and also for the raw and mdoel norm lens
+9:22 PM
+
+
+Yes. The raw vs model-norm lens difference is important.
+
+Raw Lens
+Raw uses the hidden state directly through the unembedding/head. It answers: “If I project this intermediate residual state as-is, how similar are the two models?”
+
+So raw is more sensitive to scale, norm drift, and representational calibration differences across layers/models. In the tables, raw often shows:
+
+larger TVD/JSD,
+lower Jaccard,
+worse early-layer accuracy,
+stronger late-layer jumps.
+For Qwen, raw differences stay small early/mid but spike at Last, especially JSD/TVD. That suggests the finetune does not radically change most intermediate representations, but the final prediction distribution still shifts.
+
+For Llama quantization, raw clearly separates 8-bit, 4-bit, and HF1Bit. HF1Bit raw TVD/JSD and Jaccard are very poor, which means the unnormalized hidden states are not projecting into base-like logits.
+
+For Pythia, raw is the more severe developmental comparison: 1k checkpoints are far from step143000, and 71k checkpoints are closer but still size/layer dependent.
+
+Model-Norm Lens
+Model-norm applies the saved final normalization before projection. It asks: “If this intermediate hidden state were normalized like the final layer, how similar are the logits?”
+
+This often reduces pure scale/norm artifacts and makes the comparison more about directional/content alignment. In practice:
+
+Qwen model-norm has smoother TVD/JSD than raw.
+Accuracy becomes much more meaningful across depth, rising toward late/last layers.
+Jaccard is often more stable in model-norm than raw.
+For Llama, model-norm can expose whether quantization preserved semantic direction even if raw scale is off.
+For Pythia, model-norm helps distinguish “the representation is wrong” from “the representation is not yet calibrated for the head.”
+Interpretation
+If raw differs a lot but model-norm is closer, the models may share similar representational directions but differ in activation scale/calibration.
+
+If both raw and model-norm differ a lot, the actual representational content is different.
+
+So:
+
+Qwen: mostly shared representation; differences are late and partly readout/calibration-sensitive.
+8-bit Llama: close under both, so quantization preserves content and calibration well.
+4-bit Llama: moderate degradation under both.
+HF1Bit: bad under both, so not just a norm/calibration issue.
+Pythia 1k: far under both, so early checkpoints are genuinely unlike the final model.
+Pythia 71k: closer, especially in larger models, but late-layer behavior still shows where training has not fully converged.

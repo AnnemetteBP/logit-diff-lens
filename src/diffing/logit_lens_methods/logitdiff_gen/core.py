@@ -15,6 +15,7 @@ from ..wrapper import LogitLensWrapper, normalize_activations, lmhead_project, g
 class LogitDiffRunConfig:
     prompts: List[str]
     prompt_metadata: List[Dict[str, Any]] | None = None
+    tokenizer_id: str | None = None
     layers: Sequence[float | int] = field(default_factory=lambda: (0.5, 0.6, 0.7, 0.8, 0.9))
     top_k: int = 10
     comparison_top_ks: tuple[int, ...] = (1, 5, 10)

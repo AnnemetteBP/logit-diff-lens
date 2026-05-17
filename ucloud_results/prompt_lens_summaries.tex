@@ -1,0 +1,561 @@
+% Auto-generated from prompt-lens summary JSONs.
+% Early/mid/late are thirds of the computed layer stack; Last is the last computed layer, not a separate output layer.
+% AUC is the trapezoidal mean over normalized layer depth.
+
+\begin{table}
+\centering
+\caption{Depth-resolved Qwen prompt-lens hidden-state metrics on Natural Questions NQ-500.}
+\label{tab:qwen:nq500:hidden}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Comparison} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+Risky Financial Advice & Cosine & 0.998 & 0.997 & 0.997 & 0.992 & 0.997 \\
+Risky Financial Advice & L2 & 13.846 & 21.547 & 36.025 & 72.809 & 22.965 \\
+Bad Medical Advice & Cosine & 0.998 & 0.998 & 0.997 & 0.991 & 0.998 \\
+Bad Medical Advice & L2 & 14.489 & 21.880 & 35.635 & 80.573 & 23.041 \\
+Extreme Sports & Cosine & 0.998 & 0.997 & 0.997 & 0.993 & 0.997 \\
+Extreme Sports & L2 & 14.971 & 22.705 & 36.382 & 68.755 & 23.962 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved Qwen prompt-lens Raw LogitDiff metrics on Natural Questions NQ-500.}
+\label{tab:qwen:nq500:raw}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Comparison} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+Risky Financial Advice & JSD & 0.001 & 0.002 & 0.012 & 0.078 & 0.004 \\
+Risky Financial Advice & TVD & 0.023 & 0.042 & 0.060 & 0.188 & 0.039 \\
+Risky Financial Advice & Jaccard@1 & 0.913 & 0.938 & 0.936 & 0.795 & 0.930 \\
+Risky Financial Advice & Jaccard@5 & 0.875 & 0.900 & 0.914 & 0.782 & 0.897 \\
+Risky Financial Advice & Jaccard@10 & 0.880 & 0.901 & 0.912 & 0.767 & 0.898 \\
+Risky Financial Advice & Base Acc@1 & 0.000 & 0.000 & 0.011 & 0.096 & 0.002 \\
+Risky Financial Advice & Base Acc@5 & 0.000 & 0.000 & 0.016 & 0.140 & 0.003 \\
+Risky Financial Advice & Base Acc@10 & 0.000 & 0.000 & 0.018 & 0.153 & 0.003 \\
+Risky Financial Advice & Comp. Acc@1 & 0.000 & 0.000 & 0.008 & 0.069 & 0.001 \\
+Risky Financial Advice & Comp. Acc@5 & 0.000 & 0.000 & 0.011 & 0.095 & 0.002 \\
+Risky Financial Advice & Comp. Acc@10 & 0.000 & 0.000 & 0.012 & 0.106 & 0.002 \\
+Bad Medical Advice & JSD & 0.001 & 0.002 & 0.015 & 0.106 & 0.004 \\
+Bad Medical Advice & TVD & 0.023 & 0.040 & 0.060 & 0.227 & 0.038 \\
+Bad Medical Advice & Jaccard@1 & 0.913 & 0.945 & 0.940 & 0.783 & 0.934 \\
+Bad Medical Advice & Jaccard@5 & 0.875 & 0.909 & 0.914 & 0.743 & 0.900 \\
+Bad Medical Advice & Jaccard@10 & 0.877 & 0.911 & 0.915 & 0.736 & 0.902 \\
+Bad Medical Advice & Base Acc@1 & 0.000 & 0.000 & 0.011 & 0.096 & 0.002 \\
+Bad Medical Advice & Base Acc@5 & 0.000 & 0.000 & 0.016 & 0.140 & 0.003 \\
+Bad Medical Advice & Base Acc@10 & 0.000 & 0.000 & 0.018 & 0.153 & 0.003 \\
+Bad Medical Advice & Comp. Acc@1 & 0.000 & 0.000 & 0.006 & 0.057 & 0.001 \\
+Bad Medical Advice & Comp. Acc@5 & 0.000 & 0.000 & 0.009 & 0.081 & 0.002 \\
+Bad Medical Advice & Comp. Acc@10 & 0.000 & 0.000 & 0.011 & 0.091 & 0.002 \\
+Extreme Sports & JSD & 0.001 & 0.002 & 0.012 & 0.074 & 0.004 \\
+Extreme Sports & TVD & 0.024 & 0.048 & 0.060 & 0.181 & 0.042 \\
+Extreme Sports & Jaccard@1 & 0.900 & 0.933 & 0.938 & 0.791 & 0.924 \\
+Extreme Sports & Jaccard@5 & 0.867 & 0.888 & 0.910 & 0.781 & 0.888 \\
+Extreme Sports & Jaccard@10 & 0.873 & 0.893 & 0.911 & 0.774 & 0.892 \\
+Extreme Sports & Base Acc@1 & 0.000 & 0.000 & 0.011 & 0.096 & 0.002 \\
+Extreme Sports & Base Acc@5 & 0.000 & 0.000 & 0.016 & 0.140 & 0.003 \\
+Extreme Sports & Base Acc@10 & 0.000 & 0.000 & 0.018 & 0.153 & 0.003 \\
+Extreme Sports & Comp. Acc@1 & 0.000 & 0.000 & 0.008 & 0.071 & 0.001 \\
+Extreme Sports & Comp. Acc@5 & 0.000 & 0.000 & 0.011 & 0.097 & 0.002 \\
+Extreme Sports & Comp. Acc@10 & 0.000 & 0.000 & 0.013 & 0.108 & 0.002 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved Qwen prompt-lens Model-norm LogitDiff metrics on Natural Questions NQ-500.}
+\label{tab:qwen:nq500:model_norm}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Comparison} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+Risky Financial Advice & JSD & 0.004 & 0.007 & 0.007 & 0.008 & 0.006 \\
+Risky Financial Advice & TVD & 0.062 & 0.082 & 0.078 & 0.082 & 0.074 \\
+Risky Financial Advice & Jaccard@1 & 0.905 & 0.885 & 0.895 & 0.936 & 0.893 \\
+Risky Financial Advice & Jaccard@5 & 0.864 & 0.831 & 0.844 & 0.845 & 0.845 \\
+Risky Financial Advice & Jaccard@10 & 0.864 & 0.840 & 0.843 & 0.836 & 0.848 \\
+Risky Financial Advice & Base Acc@1 & 0.004 & 0.009 & 0.174 & 0.479 & 0.054 \\
+Risky Financial Advice & Base Acc@5 & 0.011 & 0.024 & 0.274 & 0.655 & 0.091 \\
+Risky Financial Advice & Base Acc@10 & 0.017 & 0.035 & 0.317 & 0.718 & 0.110 \\
+Risky Financial Advice & Comp. Acc@1 & 0.005 & 0.010 & 0.178 & 0.479 & 0.056 \\
+Risky Financial Advice & Comp. Acc@5 & 0.011 & 0.026 & 0.278 & 0.654 & 0.093 \\
+Risky Financial Advice & Comp. Acc@10 & 0.017 & 0.037 & 0.322 & 0.723 & 0.113 \\
+Bad Medical Advice & JSD & 0.004 & 0.005 & 0.006 & 0.008 & 0.005 \\
+Bad Medical Advice & TVD & 0.061 & 0.072 & 0.067 & 0.081 & 0.067 \\
+Bad Medical Advice & Jaccard@1 & 0.903 & 0.896 & 0.915 & 0.951 & 0.903 \\
+Bad Medical Advice & Jaccard@5 & 0.864 & 0.849 & 0.864 & 0.859 & 0.858 \\
+Bad Medical Advice & Jaccard@10 & 0.866 & 0.857 & 0.864 & 0.857 & 0.861 \\
+Bad Medical Advice & Base Acc@1 & 0.004 & 0.009 & 0.174 & 0.479 & 0.054 \\
+Bad Medical Advice & Base Acc@5 & 0.011 & 0.024 & 0.274 & 0.655 & 0.091 \\
+Bad Medical Advice & Base Acc@10 & 0.017 & 0.035 & 0.317 & 0.718 & 0.110 \\
+Bad Medical Advice & Comp. Acc@1 & 0.004 & 0.009 & 0.175 & 0.478 & 0.054 \\
+Bad Medical Advice & Comp. Acc@5 & 0.011 & 0.025 & 0.275 & 0.653 & 0.092 \\
+Bad Medical Advice & Comp. Acc@10 & 0.017 & 0.036 & 0.318 & 0.713 & 0.111 \\
+Extreme Sports & JSD & 0.005 & 0.008 & 0.008 & 0.008 & 0.007 \\
+Extreme Sports & TVD & 0.066 & 0.086 & 0.079 & 0.077 & 0.078 \\
+Extreme Sports & Jaccard@1 & 0.896 & 0.880 & 0.895 & 0.936 & 0.888 \\
+Extreme Sports & Jaccard@5 & 0.850 & 0.823 & 0.839 & 0.835 & 0.836 \\
+Extreme Sports & Jaccard@10 & 0.858 & 0.832 & 0.841 & 0.850 & 0.842 \\
+Extreme Sports & Base Acc@1 & 0.004 & 0.009 & 0.174 & 0.479 & 0.054 \\
+Extreme Sports & Base Acc@5 & 0.011 & 0.024 & 0.274 & 0.655 & 0.091 \\
+Extreme Sports & Base Acc@10 & 0.017 & 0.035 & 0.317 & 0.718 & 0.110 \\
+Extreme Sports & Comp. Acc@1 & 0.005 & 0.009 & 0.175 & 0.477 & 0.054 \\
+Extreme Sports & Comp. Acc@5 & 0.012 & 0.025 & 0.274 & 0.651 & 0.092 \\
+Extreme Sports & Comp. Acc@10 & 0.018 & 0.036 & 0.314 & 0.715 & 0.110 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved quantized LLaMA prompt-lens hidden-state metrics.}
+\label{tab:llama:quant:hidden}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Quantization} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+BnB 8-bit & Cosine & 0.992 & 0.995 & 0.995 & 0.993 & 0.994 \\
+BnB 8-bit & L2 & 0.836 & 1.373 & 3.213 & 5.425 & 1.731 \\
+BnB 4-bit & Cosine & 0.979 & 0.983 & 0.981 & 0.945 & 0.982 \\
+BnB 4-bit & L2 & 1.302 & 2.250 & 6.020 & 15.250 & 2.954 \\
+HF1BitLLM 1.58-bit  & Cosine & 0.336 & 0.436 & 0.501 & 0.396 & 0.420 \\
+HF1BitLLM 1.58-bit  & L2 & 32.585 & 39.206 & 50.064 & 49.476 & 40.803 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved quantized LLaMA prompt-lens Raw LogitDiff metrics.}
+\label{tab:llama:quant:raw}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Quantization} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+BnB 8-bit & JSD & 0.000 & 0.000 & 0.000 & 0.001 & 0.000 \\
+BnB 8-bit & TVD & 0.003 & 0.005 & 0.016 & 0.031 & 0.007 \\
+BnB 8-bit & Jaccard@1 & 0.806 & 0.845 & 0.899 & 0.914 & 0.848 \\
+BnB 8-bit & Jaccard@5 & 0.710 & 0.764 & 0.847 & 0.851 & 0.770 \\
+BnB 8-bit & Jaccard@10 & 0.715 & 0.771 & 0.848 & 0.862 & 0.775 \\
+BnB 8-bit & Base Acc@1 & 0.000 & 0.004 & 0.098 & 0.376 & 0.027 \\
+BnB 8-bit & Base Acc@5 & 0.001 & 0.014 & 0.188 & 0.623 & 0.056 \\
+BnB 8-bit & Base Acc@10 & 0.001 & 0.021 & 0.245 & 0.698 & 0.075 \\
+BnB 8-bit & Comp. Acc@1 & 0.000 & 0.004 & 0.097 & 0.376 & 0.027 \\
+BnB 8-bit & Comp. Acc@5 & 0.001 & 0.015 & 0.188 & 0.620 & 0.056 \\
+BnB 8-bit & Comp. Acc@10 & 0.001 & 0.021 & 0.243 & 0.706 & 0.075 \\
+BnB 4-bit & JSD & 0.000 & 0.000 & 0.002 & 0.012 & 0.000 \\
+BnB 4-bit & TVD & 0.005 & 0.009 & 0.030 & 0.080 & 0.013 \\
+BnB 4-bit & Jaccard@1 & 0.703 & 0.736 & 0.830 & 0.803 & 0.753 \\
+BnB 4-bit & Jaccard@5 & 0.580 & 0.652 & 0.759 & 0.716 & 0.659 \\
+BnB 4-bit & Jaccard@10 & 0.585 & 0.647 & 0.750 & 0.707 & 0.656 \\
+BnB 4-bit & Base Acc@1 & 0.000 & 0.004 & 0.098 & 0.376 & 0.027 \\
+BnB 4-bit & Base Acc@5 & 0.001 & 0.014 & 0.188 & 0.623 & 0.056 \\
+BnB 4-bit & Base Acc@10 & 0.001 & 0.021 & 0.245 & 0.698 & 0.075 \\
+BnB 4-bit & Comp. Acc@1 & 0.000 & 0.004 & 0.096 & 0.382 & 0.026 \\
+BnB 4-bit & Comp. Acc@5 & 0.001 & 0.014 & 0.179 & 0.618 & 0.053 \\
+BnB 4-bit & Comp. Acc@10 & 0.001 & 0.020 & 0.237 & 0.698 & 0.073 \\
+HF1BitLLM 1.58-bit  & JSD & 0.052 & 0.065 & 0.088 & 0.086 & 0.068 \\
+HF1BitLLM 1.58-bit  & TVD & 0.113 & 0.163 & 0.265 & 0.307 & 0.178 \\
+HF1BitLLM 1.58-bit  & Jaccard@1 & 0.013 & 0.042 & 0.094 & 0.208 & 0.046 \\
+HF1BitLLM 1.58-bit  & Jaccard@5 & 0.008 & 0.028 & 0.070 & 0.184 & 0.032 \\
+HF1BitLLM 1.58-bit  & Jaccard@10 & 0.008 & 0.027 & 0.069 & 0.184 & 0.₀31 \\
+HF1BitLLM 1.58-bit  & Base Acc@1 & 0.₀₀₀ & 0.₀₀₄ & 0.₀₉₈ & 0.₃₇₆ & 
+HF1BitLLM 1.58-bit  & Base Acc@5 & 0.001 & 0.014 & 0.188 & 0.623 & 0.056 \\
+HF1BitLLM 1.58-bit  & Base Acc@10 & 0.001 & 0.021 & 0.245 & 0.698 & 0.075 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@1 & 0.001 & 0.004 & 0.065 & 0.166 & 0.020 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@5 & 0.002 & 0.008 & 0.137 & 0.352 & 0.042 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@10 & 0.002 & 0.₀₁₃ & 0.₁₇₂ & ₀.₄₀₄ & ₀.₀₅₄ \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved quantized LLaMA prompt-lens Model-norm LogitDiff metrics.}
+\label{tab:llama:quant:model_norm}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l l | r r r r | r}
+\toprule
+\textbf{Quantization} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+BnB 8-bit & JSD & 0.010 & 0.007 & 0.008 & 0.006 & 0.008 \\
+BnB 8-bit & TVD & 0.106 & 0.087 & 0.082 & 0.066 & 0.093 \\
+BnB 8-bit & Jaccard@1 & 0.775 & 0.818 & 0.872 & 0.864 & 0.819 \\
+BnB 8-bit & Jaccard@5 & 0.692 & 0.737 & 0.812 & 0.857 & 0.743 \\
+BnB 8-bit & Jaccard@10 & 0.703 & 0.756 & 0.816 & 0.851 & 0.754 \\
+BnB 8-bit & Base Acc@1 & 0.000 & 0.006 & 0.136 & 0.412 & 0.039 \\
+BnB 8-bit & Base Acc@5 & 0.000 & 0.016 & 0.241 & 0.642 & 0.073 \\
+BnB 8-bit & Base Acc@10 & 0.001 & 0.023 & 0.291 & 0.710 & 0.091 \\
+BnB 8-bit & Comp. Acc@1 & 0.000 & 0.006 & 0.134 & 0.405 & 0.039 \\
+BnB 8-bit & Comp. Acc@5 & 0.000 & 0.016 & 0.242 & 0.642 & 0.074 \\
+BnB 8-bit & Comp. Acc@10 & 0.001 & 0.022 & 0.290 & 0.712 & 0.090 \\
+BnB 4-bit & JSD & 0.025 & 0.021 & 0.025 & 0.040 & 0.024 \\
+BnB 4-bit & TVD & 0.169 & 0.152 & 0.146 & 0.157 & 0.157 \\
+BnB 4-bit & Jaccard@1 & 0.665 & 0.703 & 0.799 & 0.861 & 0.717 \\
+BnB 4-bit & Jaccard@5 & 0.551 & 0.602 & 0.699 & 0.744 & 0.611 \\
+BnB 4-bit & Jaccard@10 & 0.580 & 0.628 & 0.713 & 0.727 & 0.636 \\
+BnB 4-bit & Base Acc@1 & 0.000 & 0.006 & 0.136 & 0.412 & 0.039 \\
+BnB 4-bit & Base Acc@5 & 0.000 & 0.016 & 0.241 & 0.642 & 0.073 \\
+BnB 4-bit & Base Acc@10 & 0.001 & 0.023 & 0.291 & 0.710 & 0.091 \\
+BnB 4-bit & Comp. Acc@1 & 0.000 & 0.006 & 0.132 & 0.399 & 0.038 \\
+BnB 4-bit & Comp. Acc@5 & 0.000 & 0.016 & 0.239 & 0.640 & 0.073 \\
+BnB 4-bit & Comp. Acc@10 & 0.001 & 0.022 & 0.285 & 0.706 & 0.088 \\
+HF1BitLLM 1.58-bit  & JSD & 0.388 & 0.362 & 0.401 & 0.432 & 0.383 \\
+HF1BitLLM 1.58-bit  & TVD & 0.728 & 0.700 & 0.728 & 0.750 & 0.719 \\
+HF1BitLLM 1.58-bit  & Jaccard@1 & 0.008 & 0.044 & 0.118 & 0.233 & 0.053 \\
+HF1BitLLM 1.58-bit  & Jaccard@5 & 0.008 & 0.029 & 0.093 & 0.191 & 0.040 \\
+HF1BitLLM 1.58-bit  & Jaccard@10 & 0.008 & 0.028 & 0.088 & 0.190 & 0.038 \\
+HF1BitLLM 1.58-bit  & Base Acc@1 & 0.000 & 0.006 & 0.136 & 0.412 & 0.039 \\
+HF1BitLLM 1.58-bit  & Base Acc@5 & 0.000 & 0.016 & 0.241 & 0.642 & 0.073 \\
+HF1BitLLM 1.58-bit  & Base Acc@10 & 0.001 & 0.023 & 0.291 & 0.710 & 0.091 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@1 & 0.001 & 0.004 & 0.066 & 0.194 & 0.020 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@5 & 0.001 & 0.009 & 0.135 & 0.362 & 0.041 \\
+HF1BitLLM 1.58-bit  & Comp. Acc@10 & 0.001 & 0.012 & 0.169 & 0.432 & 0.052 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved Pythia prompt-lens hidden-state metrics. Early (1k) and mid (71k) checkpoints are compared against the last available checkpoint used here, step143000.}
+\label{tab:pythia:hidden}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l r l l | r r r r | r}
+\toprule
+\textbf{Pythia} & \textbf{Layers} & \textbf{Step} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+160M & 12 & early (1k) & Cosine & 0.248 & 0.257 & 0.214 & 0.112 & 0.247 \\
+160M & 12 & early (1k) & L2 & 16.292 & 30.203 & 42.745 & 66.879 & 28.910 \\
+160M & 12 & mid (71k) & Cosine & 0.896 & 0.822 & 0.636 & 0.298 & 0.801 \\
+160M & 12 & mid (71k) & L2 & 17.219 & 29.544 & 51.386 & 76.110 & 31.693 \\
+410M & 24 & early (1k) & Cosine & 0.260 & 0.282 & 0.245 & 0.212 & 0.264 \\
+410M & 24 & early (1k) & L2 & 35.527 & 70.105 & 72.426 & 40.822 & 60.719 \\
+410M & 24 & mid (71k) & Cosine & 0.928 & 0.894 & 0.782 & 0.696 & 0.870 \\
+410M & 24 & mid (71k) & L2 & 22.709 & 37.306 & 51.204 & 58.452 & 37.138 \\
+1.4B & 24 & early (1k) & Cosine & 0.228 & 0.203 & 0.196 & 0.205 & 0.208 \\
+1.4B & 24 & early (1k) & L2 & 76.188 & 130.135 & 163.597 & 113.534 & 125.547 \\
+1.4B & 24 & mid (71k) & Cosine & 0.937 & 0.903 & 0.882 & 0.835 & 0.908 \\
+1.4B & 24 & mid (71k) & L2 & 43.051 & 70.323 & 101.005 & 112.373 & 71.604 \\
+2.8B & 32 & early (1k) & Cosine & 0.187 & 0.177 & 0.167 & 0.211 & 0.176 \\
+2.8B & 32 & early (1k) & L2 & 87.051 & 144.543 & 218.243 & 169.591 & 149.197 \\
+2.8B & 32 & mid (71k) & Cosine & 0.951 & 0.953 & 0.953 & 0.866 & 0.953 \\
+2.8B & 32 & mid (71k) & L2 & 39.454 & 63.736 & 96.873 & 145.439 & 65.123 \\
+6.9B & 32 & early (1k) & Cosine & 0.163 & 0.159 & 0.165 & 0.198 & 0.162 \\
+6.9B & 32 & early (1k) & L2 & 193.055 & 383.817 & 478.340 & 319.165 & 352.813 \\
+6.9B & 32 & mid (71k) & Cosine & 0.963 & 0.969 & 0.955 & 0.868 & 0.964 \\
+6.9B & 32 & mid (71k) & L2 & 62.602 & 109.584 & 150.748 & 216.454 & 105.729 \\
+12B & 36 & early (1k) & Cosine & 0.149 & 0.130 & 0.146 & 0.182 & 0.141 \\
+12B & 36 & early (1k) & L2 & 271.726 & 607.791 & 724.184 & 509.845 & 541.183 \\
+12B & 36 & mid (71k) & Cosine & 0.970 & 0.979 & 0.958 & 0.866 & 0.970 \\
+12B & 36 & mid (71k) & L2 & 92.222 & 173.343 & 233.384 & 347.503 & 165.411 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved Pythia prompt-lens Raw LogitDiff metrics. Early (1k) and mid (71k) checkpoints are compared against step143000.}
+\label{tab:pythia:raw}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l r l l | r r r r | r}
+\toprule
+\textbf{Pythia} & \textbf{Layers} & \textbf{Step} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+160M & 12 & early (1k) & JSD & 0.069 & 0.160 & 0.385 & 0.402 & 0.203 \\
+160M & 12 & early (1k) & TVD & 0.272 & 0.435 & 0.709 & 0.722 & 0.473 \\
+160M & 12 & early (1k) & Jaccard@1 & 0.006 & 0.040 & 0.074 & 0.108 & 0.038 \\
+160M & 12 & early (1k) & Jaccard@5 & 0.008 & 0.035 & 0.080 & 0.117 & 0.039 \\
+160M & 12 & early (1k) & Jaccard@10 & 0.010 & 0.045 & 0.111 & 0.146 & 0.053 \\
+160M & 12 & early (1k) & Base Acc@1 & 0.014 & 0.040 & 0.118 & 0.187 & 0.053 \\
+160M & 12 & early (1k) & Base Acc@5 & 0.052 & 0.091 & 0.262 & 0.334 & 0.130 \\
+160M & 12 & early (1k) & Base Acc@10 & 0.079 & 0.132 & 0.345 & 0.417 & 0.180 \\
+160M & 12 & early (1k) & Comp. Acc@1 & 0.023 & 0.109 & 0.127 & 0.135 & 0.088 \\
+160M & 12 & early (1k) & Comp. Acc@5 & 0.084 & 0.287 & 0.333 & 0.354 & 0.239 \\
+160M & 12 & early (1k) & Comp. Acc@10 & 0.123 & 0.401 & 0.457 & 0.492 & 0.333 \\
+160M & 12 & mid (71k) & JSD & 0.072 & 0.143 & 0.430 & 0.458 & 0.212 \\
+160M & 12 & mid (71k) & TVD & 0.279 & 0.400 & 0.757 & 0.790 & 0.476 \\
+160M & 12 & mid (71k) & Jaccard@1 & 0.095 & 0.096 & 0.118 & 0.184 & 0.098 \\
+160M & 12 & mid (71k) & Jaccard@5 & 0.087 & 0.085 & 0.119 & 0.159 & 0.094 \\
+160M & 12 & mid (71k) & Jaccard@10 & 0.090 & 0.094 & 0.137 & 0.171 & 0.105 \\
+160M & 12 & mid (71k) & Base Acc@1 & 0.014 & 0.040 & 0.118 & 0.187 & 0.053 \\
+160M & 12 & mid (71k) & Base Acc@5 & 0.052 & 0.091 & 0.262 & 0.334 & 0.130 \\
+160M & 12 & mid (71k) & Base Acc@10 & 0.079 & 0.132 & 0.345 & 0.417 & 0.180 \\
+160M & 12 & mid (71k) & Comp. Acc@1 & 0.030 & 0.086 & 0.165 & 0.246 & 0.090 \\
+160M & 12 & mid (71k) & Comp. Acc@5 & 0.099 & 0.228 & 0.379 & 0.501 & 0.230 \\
+160M & 12 & mid (71k) & Comp. Acc@10 & 0.146 & 0.308 & 0.486 & 0.606 & 0.309 \\
+410M & 24 & early (1k) & JSD & 0.045 & 0.079 & 0.150 & 0.126 & 0.092 \\
+410M & 24 & early (1k) & TVD & 0.215 & 0.281 & 0.424 & 0.401 & 0.308 \\
+410M & 24 & early (1k) & Jaccard@1 & 0.021 & 0.052 & 0.145 & 0.229 & 0.070 \\
+410M & 24 & early (1k) & Jaccard@5 & 0.018 & 0.050 & 0.141 & 0.233 & 0.068 \\
+410M & 24 & early (1k) & Jaccard@10 & 0.018 & 0.055 & 0.158 & 0.268 & 0.074 \\
+410M & 24 & early (1k) & Base Acc@1 & 0.017 & 0.049 & 0.186 & 0.392 & 0.079 \\
+410M & 24 & early (1k) & Base Acc@5 & 0.052 & 0.129 & 0.364 & 0.663 & 0.175 \\
+410M & 24 & early (1k) & Base Acc@10 & 0.077 & 0.188 & 0.443 & 0.762 & 0.228 \\
+410M & 24 & early (1k) & Comp. Acc@1 & 0.049 & 0.103 & 0.141 & 0.148 & 0.099 \\
+410M & 24 & early (1k) & Comp. Acc@5 & 0.127 & 0.274 & 0.351 & 0.377 & 0.253 \\
+410M & 24 & early (1k) & Comp. Acc@10 & 0.177 & 0.376 & 0.488 & 0.518 & 0.350 \\
+410M & 24 & mid (71k) & JSD & 0.061 & 0.100 & 0.306 & 0.419 & 0.153 \\
+410M & 24 & mid (71k) & TVD & 0.260 & 0.331 & 0.632 & 0.769 & 0.405 \\
+410M & 24 & mid (71k) & Jaccard@1 & 0.297 & 0.284 & 0.401 & 0.528 & 0.322 \\
+410M & 24 & mid (71k) & Jaccard@5 & 0.242 & 0.251 & 0.380 & 0.476 & 0.288 \\
+410M & 24 & mid (71k) & Jaccard@10 & 0.246 & 0.258 & 0.383 & 0.496 & 0.292 \\
+410M & 24 & mid (71k) & Base Acc@1 & 0.017 & 0.049 & 0.186 & 0.392 & 0.079 \\
+410M & 24 & mid (71k) & Base Acc@5 & 0.052 & 0.129 & 0.364 & 0.663 & 0.175 \\
+410M & 24 & mid (71k) & Base Acc@10 & 0.077 & 0.188 & 0.443 & 0.762 & 0.228 \\
+410M & 24 & mid (71k) & Comp. Acc@1 & 0.027 & 0.070 & 0.159 & 0.318 & 0.082 \\
+410M & 24 & mid (71k) & Comp. Acc@5 & 0.072 & 0.194 & 0.361 & 0.586 & 0.204 \\
+410M & 24 & mid (71k) & Comp. Acc@10 & 0.098 & 0.257 & 0.443 & 0.689 & 0.261 \\
+1.4B & 24 & early (1k) & JSD & 0.113 & 0.202 & 0.511 & 0.404 & 0.277 \\
+1.4B & 24 & early (1k) & TVD & 0.365 & 0.501 & 0.849 & 0.745 & 0.575 \\
+1.4B & 24 & early (1k) & Jaccard@1 & 0.035 & 0.059 & 0.095 & 0.194 & 0.062 \\
+1.4B & 24 & early (1k) & Jaccard@5 & 0.023 & 0.064 & 0.100 & 0.220 & 0.060 \\
+1.4B & 24 & early (1k) & Jaccard@10 & 0.021 & 0.067 & 0.114 & 0.263 & 0.065 \\
+1.4B & 24 & early (1k) & Base Acc@1 & 0.027 & 0.066 & 0.152 & 0.433 & 0.076 \\
+1.4B & 24 & early (1k) & Base Acc@5 & 0.076 & 0.182 & 0.288 & 0.696 & 0.174 \\
+1.4B & 24 & early (1k) & Base Acc@10 & 0.100 & 0.248 & 0.350 & 0.793 & 0.224 \\
+1.4B & 24 & early (1k) & Comp. Acc@1 & 0.057 & 0.114 & 0.142 & 0.143 & 0.105 \\
+1.4B & 24 & early (1k) & Comp. Acc@5 & 0.159 & 0.326 & 0.393 & 0.407 & 0.296 \\
+1.4B & 24 & early (1k) & Comp. Acc@10 & 0.214 & 0.448 & 0.516 & 0.534 & 0.397 \\
+1.4B & 24 & mid (71k) & JSD & 0.137 & 0.256 & 0.212 & 0.162 & 0.205 \\
+1.4B & 24 & mid (71k) & TVD & 0.408 & 0.577 & 0.494 & 0.412 & 0.499 \\
+1.4B & 24 & mid (71k) & Jaccard@1 & 0.264 & 0.352 & 0.510 & 0.644 & 0.373 \\
+1.4B & 24 & mid (71k) & Jaccard@5 & 0.241 & 0.320 & 0.483 & 0.582 & 0.345 \\
+1.4B & 24 & mid (71k) & Jaccard@10 & 0.239 & 0.317 & 0.515 & 0.604 & 0.354 \\
+1.4B & 24 & mid (71k) & Base Acc@1 & 0.027 & 0.066 & 0.152 & 0.433 & 0.076 \\
+1.4B & 24 & mid (71k) & Base Acc@5 & 0.076 & 0.182 & 0.288 & 0.696 & 0.174 \\
+1.4B & 24 & mid (71k) & Base Acc@10 & 0.100 & 0.248 & 0.350 & 0.793 & 0.224 \\
+1.4B & 24 & mid (71k) & Comp. Acc@1 & 0.031 & 0.075 & 0.151 & 0.373 & 0.081 \\
+1.4B & 24 & mid (71k) & Comp. Acc@5 & 0.091 & 0.195 & 0.323 & 0.633 & 0.197 \\
+1.4B & 24 & mid (71k) & Comp. Acc@10 & 0.129 & 0.263 & 0.407 & 0.757 & 0.260 \\
+2.8B & 32 & early (1k) & JSD & 0.179 & 0.404 & 0.603 & 0.459 & 0.393 \\
+2.8B & 32 & early (1k) & TVD & 0.465 & 0.740 & 0.930 & 0.799 & 0.710 \\
+2.8B & 32 & early (1k) & Jaccard@1 & 0.019 & 0.055 & 0.088 & 0.217 & 0.051 \\
+2.8B & 32 & early (1k) & Jaccard@5 & 0.014 & 0.044 & 0.090 & 0.227 & 0.046 \\
+2.8B & 32 & early (1k) & Jaccard@10 & 0.013 & 0.044 & 0.088 & 0.261 & 0.044 \\
+2.8B & 32 & early (1k) & Base Acc@1 & 0.016 & 0.052 & 0.099 & 0.428 & 0.049 \\
+2.8B & 32 & early (1k) & Base Acc@5 & 0.041 & 0.136 & 0.196 & 0.696 & 0.114 \\
+2.8B & 32 & early (1k) & Base Acc@10 & 0.057 & 0.184 & 0.230 & 0.791 & 0.146 \\
+2.8B & 32 & early (1k) & Comp. Acc@1 & 0.072 & 0.130 & 0.143 & 0.153 & 0.115 \\
+2.8B & 32 & early (1k) & Comp. Acc@5 & 0.188 & 0.334 & 0.381 & 0.401 & 0.301 \\
+2.8B & 32 & early (1k) & Comp. Acc@10 & 0.259 & 0.450 & 0.519 & 0.529 & 0.410 \\
+2.8B & 32 & mid (71k) & JSD & 0.165 & 0.291 & 0.122 & 0.118 & 0.198 \\
+2.8B & 32 & mid (71k) & TVD & 0.446 & 0.616 & 0.336 & 0.303 & 0.475 \\
+2.8B & 32 & mid (71k) & Jaccard@1 & 0.229 & 0.372 & 0.685 & 0.749 & 0.419 \\
+2.8B & 32 & mid (71k) & Jaccard@5 & 0.203 & 0.304 & 0.642 & 0.625 & 0.374 \\
+2.8B & 32 & mid (71k) & Jaccard@10 & 0.210 & 0.298 & 0.647 & 0.655 & 0.375 \\
+2.8B & 32 & mid (71k) & Base Acc@1 & 0.016 & 0.052 & 0.099 & 0.428 & 0.049 \\
+2.8B & 32 & mid (71k) & Base Acc@5 & 0.041 & 0.136 & 0.196 & 0.696 & 0.114 \\
+2.8B & 32 & mid (71k) & Base Acc@10 & 0.057 & 0.184 & 0.230 & 0.791 & 0.146 \\
+2.8B & 32 & mid (71k) & Comp. Acc@1 & 0.016 & 0.080 & 0.109 & 0.385 & 0.063 \\
+2.8B & 32 & mid (71k) & Comp. Acc@5 & 0.045 & 0.199 & 0.231 & 0.656 & 0.151 \\
+2.8B & 32 & mid (71k) & Comp. Acc@10 & 0.066 & 0.265 & 0.286 & 0.767 & 0.197 \\
+6.9B & 32 & early (1k) & JSD & 0.360 & 0.576 & 0.592 & 0.533 & 0.512 \\
+6.9B & 32 & early (1k) & TVD & 0.688 & 0.896 & 0.897 & 0.835 & 0.832 \\
+6.9B & 32 & early (1k) & Jaccard@1 & 0.049 & 0.076 & 0.089 & 0.141 & 0.071 \\
+6.9B & 32 & early (1k) & Jaccard@5 & 0.029 & 0.068 & 0.101 & 0.183 & 0.064 \\
+6.9B & 32 & early (1k) & Jaccard@10 & 0.028 & 0.068 & 0.099 & 0.221 & 0.062 \\
+6.9B & 32 & early (1k) & Base Acc@1 & 0.036 & 0.026 & 0.082 & 0.436 & 0.041 \\
+6.9B & 32 & early (1k) & Base Acc@5 & 0.101 & 0.062 & 0.161 & 0.702 & 0.098 \\
+6.9B & 32 & early (1k) & Base Acc@10 & 0.139 & 0.086 & 0.197 & 0.778 & 0.130 \\
+6.9B & 32 & early (1k) & Comp. Acc@1 & 0.047 & 0.053 & 0.100 & 0.131 & 0.066 \\
+6.9B & 32 & early (1k) & Comp. Acc@5 & 0.128 & 0.155 & 0.268 & 0.346 & 0.181 \\
+6.9B & 32 & early (1k) & Comp. Acc@10 & 0.173 & 0.226 & 0.366 & 0.466 & 0.252 \\
+6.9B & 32 & mid (71k) & JSD & 0.191 & 0.154 & 0.136 & 0.118 & 0.163 \\
+6.9B & 32 & mid (71k) & TVD & 0.491 & 0.408 & 0.324 & 0.266 & 0.414 \\
+6.9B & 32 & mid (71k) & Jaccard@1 & 0.425 & 0.608 & 0.663 & 0.752 & 0.562 \\
+6.9B & 32 & mid (71k) & Jaccard@5 & 0.399 & 0.594 & 0.651 & 0.621 & 0.547 \\
+6.9B & 32 & mid (71k) & Jaccard@10 & 0.424 & 0.610 & 0.666 & 0.652 & 0.565 \\
+6.9B & 32 & mid (71k) & Base Acc@1 & 0.036 & 0.026 & 0.082 & 0.436 & 0.041 \\
+6.9B & 32 & mid (71k) & Base Acc@5 & 0.101 & 0.062 & 0.161 & 0.702 & 0.098 \\
+6.9B & 32 & mid (71k) & Base Acc@10 & 0.139 & 0.086 & 0.197 & 0.778 & 0.130 \\
+6.9B & 32 & mid (71k) & Comp. Acc@1 & 0.045 & 0.031 & 0.100 & 0.393 & 0.053 \\
+6.9B & 32 & mid (71k) & Comp. Acc@5 & 0.135 & 0.080 & 0.213 & 0.676 & 0.133 \\
+6.9B & 32 & mid (71k) & Comp. Acc@10 & 0.180 & 0.106 & 0.268 & 0.785 & 0.174 \\
+12B & 36 & early (1k) & JSD & 0.501 & 0.599 & 0.576 & 0.542 & 0.563 \\
+12B & 36 & early (1k) & TVD & 0.832 & 0.906 & 0.865 & 0.831 & 0.872 \\
+12B & 36 & early (1k) & Jaccard@1 & 0.031 & 0.088 & 0.131 & 0.157 & 0.084 \\
+12B & 36 & early (1k) & Jaccard@5 & 0.027 & 0.067 & 0.103 & 0.190 & 0.065 \\
+12B & 36 & early (1k) & Jaccard@10 & 0.026 & 0.055 & 0.093 & 0.217 & 0.057 \\
+12B & 36 & early (1k) & Base Acc@1 & 0.019 & 0.020 & 0.101 & 0.467 & 0.041 \\
+12B & 36 & early (1k) & Base Acc@5 & 0.064 & 0.042 & 0.191 & 0.721 & 0.091 \\
+12B & 36 & early (1k) & Base Acc@10 & 0.096 & 0.058 & 0.229 & 0.804 & 0.119 \\
+12B & 36 & early (1k) & Comp. Acc@1 & 0.032 & 0.032 & 0.083 & 0.126 & 0.048 \\
+12B & 36 & early (1k) & Comp. Acc@5 & 0.086 & 0.129 & 0.234 & 0.309 & 0.149 \\
+12B & 36 & early (1k) & Comp. Acc@10 & 0.115 & 0.180 & 0.322 & 0.421 & 0.205 \\
+12B & 36 & mid (71k) & JSD & 0.229 & 0.131 & 0.179 & 0.128 & 0.180 \\
+12B & 36 & mid (71k) & TVD & 0.532 & 0.321 & 0.348 & 0.259 & 0.401 \\
+12B & 36 & mid (71k) & Jaccard@1 & 0.413 & 0.671 & 0.649 & 0.742 & 0.580 \\
+12B & 36 & mid (71k) & Jaccard@5 & 0.402 & 0.549 & 0.550 & 0.637 & 0.500 \\
+12B & 36 & mid (71k) & Jaccard@10 & 0.408 & 0.565 & 0.556 & 0.648 & 0.510 \\
+12B & 36 & mid (71k) & Base Acc@1 & 0.019 & 0.020 & 0.101 & 0.467 & 0.041 \\
+12B & 36 & mid (71k) & Base Acc@5 & 0.064 & 0.042 & 0.191 & 0.721 & 0.091 \\
+12B & 36 & mid (71k) & Base Acc@10 & 0.096 & 0.058 & 0.229 & 0.804 & 0.119 \\
+12B & 36 & mid (71k) & Comp. Acc@1 & 0.033 & 0.035 & 0.155 & 0.430 & 0.070 \\
+12B & 36 & mid (71k) & Comp. Acc@5 & 0.097 & 0.072 & 0.313 & 0.715 & 0.155 \\
+12B & 36 & mid (71k) & Comp. Acc@10 & 0.144 & 0.106 & 0.385 & 0.823 & 0.205 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}
+
+\begin{table}
+\centering
+\caption{Depth-resolved Pythia prompt-lens Model-norm LogitDiff metrics. Early (1k) and mid (71k) checkpoints are compared against step143000.}
+\label{tab:pythia:model_norm}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l r l l | r r r r | r}
+\toprule
+\textbf{Pythia} & \textbf{Layers} & \textbf{Step} & \textbf{Metric} & \textbf{Early} & \textbf{Mid} & \textbf{Late} & \textbf{Last} & \textbf{AUC} \\
+\midrule
+160M & 12 & early (1k) & JSD & 0.680 & 0.672 & 0.558 & 0.284 & 0.650 \\
+160M & 12 & early (1k) & TVD & 0.991 & 0.985 & 0.875 & 0.604 & 0.964 \\
+160M & 12 & early (1k) & Jaccard@1 & 0.003 & 0.006 & 0.077 & 0.229 & 0.020 \\
+160M & 12 & early (1k) & Jaccard@5 & 0.002 & 0.005 & 0.079 & 0.242 & 0.020 \\
+160M & 12 & early (1k) & Jaccard@10 & 0.002 & 0.006 & 0.093 & 0.289 & 0.024 \\
+160M & 12 & early (1k) & Base Acc@1 & 0.000 & 0.001 & 0.097 & 0.327 & 0.021 \\
+160M & 12 & early (1k) & Base Acc@5 & 0.001 & 0.006 & 0.195 & 0.608 & 0.046 \\
+160M & 12 & early (1k) & Base Acc@10 & 0.002 & 0.011 & 0.231 & 0.697 & 0.057 \\
+160M & 12 & early (1k) & Comp. Acc@1 & 0.017 & 0.111 & 0.120 & 0.140 & 0.084 \\
+160M & 12 & early (1k) & Comp. Acc@5 & 0.066 & 0.282 & 0.318 & 0.357 & 0.225 \\
+160M & 12 & early (1k) & Comp. Acc@10 & 0.104 & 0.391 & 0.438 & 0.489 & 0.316 \\
+160M & 12 & mid (71k) & JSD & 0.570 & 0.588 & 0.461 & 0.103 & 0.559 \\
+160M & 12 & mid (71k) & TVD & 0.903 & 0.917 & 0.759 & 0.330 & 0.882 \\
+160M & 12 & mid (71k) & Jaccard@1 & 0.085 & 0.053 & 0.191 & 0.546 & 0.089 \\
+160M & 12 & mid (71k) & Jaccard@5 & 0.079 & 0.052 & 0.172 & 0.476 & 0.084 \\
+160M & 12 & mid (71k) & Jaccard@10 & 0.087 & 0.062 & 0.190 & 0.517 & 0.095 \\
+160M & 12 & mid (71k) & Base Acc@1 & 0.000 & 0.001 & 0.097 & 0.327 & 0.021 \\
+160M & 12 & mid (71k) & Base Acc@5 & 0.001 & 0.006 & 0.195 & 0.608 & 0.046 \\
+160M & 12 & mid (71k) & Base Acc@10 & 0.002 & 0.011 & 0.231 & 0.697 & 0.057 \\
+160M & 12 & mid (71k) & Comp. Acc@1 & 0.035 & 0.096 & 0.234 & 0.338 & 0.116 \\
+160M & 12 & mid (71k) & Comp. Acc@5 & 0.119 & 0.250 & 0.482 & 0.608 & 0.277 \\
+160M & 12 & mid (71k) & Comp. Acc@10 & 0.174 & 0.341 & 0.595 & 0.722 & 0.364 \\
+410M & 24 & early (1k) & JSD & 0.507 & 0.473 & 0.389 & 0.311 & 0.458 \\
+410M & 24 & early (1k) & TVD & 0.847 & 0.816 & 0.726 & 0.634 & 0.798 \\
+410M & 24 & early (1k) & Jaccard@1 & 0.022 & 0.055 & 0.161 & 0.247 & 0.077 \\
+410M & 24 & early (1k) & Jaccard@5 & 0.020 & 0.056 & 0.169 & 0.249 & 0.080 \\
+410M & 24 & early (1k) & Jaccard@10 & 0.020 & 0.062 & 0.191 & 0.282 & 0.089 \\
+410M & 24 & early (1k) & Base Acc@1 & 0.018 & 0.053 & 0.228 & 0.420 & 0.095 \\
+410M & 24 & early (1k) & Base Acc@5 & 0.057 & 0.145 & 0.445 & 0.684 & 0.209 \\
+410M & 24 & early (1k) & Base Acc@10 & 0.083 & 0.206 & 0.541 & 0.791 & 0.271 \\
+410M & 24 & early (1k) & Comp. Acc@1 & 0.044 & 0.104 & 0.137 & 0.150 & 0.096 \\
+410M & 24 & early (1k) & Comp. Acc@5 & 0.116 & 0.271 & 0.346 & 0.378 & 0.247 \\
+410M & 24 & early (1k) & Comp. Acc@10 & 0.162 & 0.373 & 0.482 & 0.519 & 0.342 \\
+410M & 24 & mid (71k) & JSD & 0.188 & 0.191 & 0.173 & 0.062 & 0.187 \\
+410M & 24 & mid (71k) & TVD & 0.491 & 0.489 & 0.444 & 0.245 & 0.479 \\
+410M & 24 & mid (71k) & Jaccard@1 & 0.306 & 0.315 & 0.448 & 0.672 & 0.349 \\
+410M & 24 & mid (71k) & Jaccard@5 & 0.252 & 0.273 & 0.404 & 0.577 & 0.305 \\
+410M & 24 & mid (71k) & Jaccard@10 & 0.259 & 0.280 & 0.416 & 0.594 & 0.313 \\
+410M & 24 & mid (71k) & Base Acc@1 & 0.018 & 0.053 & 0.228 & 0.420 & 0.095 \\
+410M & 24 & mid (71k) & Base Acc@5 & 0.057 & 0.145 & 0.445 & 0.684 & 0.209 \\
+410M & 24 & mid (71k) & Base Acc@10 & 0.083 & 0.206 & 0.541 & 0.791 & 0.271 \\
+410M & 24 & mid (71k) & Comp. Acc@1 & 0.030 & 0.081 & 0.235 & 0.412 & 0.111 \\
+410M & 24 & mid (71k) & Comp. Acc@5 & 0.082 & 0.223 & 0.481 & 0.667 & 0.258 \\
+410M & 24 & mid (71k) & Comp. Acc@10 & 0.113 & 0.299 & 0.584 & 0.779 & 0.328 \\
+1.4B & 24 & early (1k) & JSD & 0.404 & 0.410 & 0.412 & 0.333 & 0.411 \\
+1.4B & 24 & early (1k) & TVD & 0.749 & 0.754 & 0.752 & 0.662 & 0.754 \\
+1.4B & 24 & early (1k) & Jaccard@1 & 0.052 & 0.076 & 0.140 & 0.208 & 0.088 \\
+1.4B & 24 & early (1k) & Jaccard@5 & 0.031 & 0.079 & 0.152 & 0.234 & 0.086 \\
+1.4B & 24 & early (1k) & Jaccard@10 & 0.028 & 0.080 & 0.170 & 0.288 & 0.090 \\
+1.4B & 24 & early (1k) & Base Acc@1 & 0.038 & 0.085 & 0.245 & 0.487 & 0.117 \\
+1.4B & 24 & early (1k) & Base Acc@5 & 0.099 & 0.216 & 0.438 & 0.747 & 0.244 \\
+1.4B & 24 & early (1k) & Base Acc@10 & 0.138 & 0.282 & 0.525 & 0.836 & 0.308 \\
+1.4B & 24 & early (1k) & Comp. Acc@1 & 0.057 & 0.115 & 0.141 & 0.143 & 0.105 \\
+1.4B & 24 & early (1k) & Comp. Acc@5 & 0.156 & 0.327 & 0.391 & 0.407 & 0.294 \\
+1.4B & 24 & early (1k) & Comp. Acc@10 & 0.210 & 0.449 & 0.514 & 0.540 & 0.395 \\
+1.4B & 24 & mid (71k) & JSD & 0.125 & 0.139 & 0.119 & 0.046 & 0.130 \\
+1.4B & 24 & mid (71k) & TVD & 0.394 & 0.411 & 0.360 & 0.207 & 0.393 \\
+1.4B & 24 & mid (71k) & Jaccard@1 & 0.304 & 0.388 & 0.512 & 0.724 & 0.395 \\
+1.4B & 24 & mid (71k) & Jaccard@5 & 0.273 & 0.336 & 0.454 & 0.617 & 0.349 \\
+1.4B & 24 & mid (71k) & Jaccard@10 & 0.277 & 0.335 & 0.467 & 0.645 & 0.355 \\
+1.4B & 24 & mid (71k) & Base Acc@1 & 0.038 & 0.085 & 0.245 & 0.487 & 0.117 \\
+1.4B & 24 & mid (71k) & Base Acc@5 & 0.099 & 0.216 & 0.438 & 0.747 & 0.244 \\
+1.4B & 24 & mid (71k) & Base Acc@10 & 0.138 & 0.282 & 0.525 & 0.836 & 0.308 \\
+1.4B & 24 & mid (71k) & Comp. Acc@1 & 0.050 & 0.101 & 0.267 & 0.450 & 0.135 \\
+1.4B & 24 & mid (71k) & Comp. Acc@5 & 0.133 & 0.250 & 0.509 & 0.740 & 0.292 \\
+1.4B & 24 & mid (71k) & Comp. Acc@10 & 0.184 & 0.327 & 0.610 & 0.822 & 0.369 \\
+2.8B & 32 & early (1k) & JSD & 0.442 & 0.421 & 0.409 & 0.356 & 0.424 \\
+2.8B & 32 & early (1k) & TVD & 0.785 & 0.765 & 0.750 & 0.687 & 0.767 \\
+2.8B & 32 & early (1k) & Jaccard@1 & 0.032 & 0.095 & 0.133 & 0.206 & 0.085 \\
+2.8B & 32 & early (1k) & Jaccard@5 & 0.024 & 0.074 & 0.141 & 0.223 & 0.077 \\
+2.8B & 32 & early (1k) & Jaccard@10 & 0.022 & 0.071 & 0.148 & 0.276 & 0.076 \\
+2.8B & 32 & early (1k) & Base Acc@1 & 0.026 & 0.103 & 0.220 & 0.501 & 0.109 \\
+2.8B & 32 & early (1k) & Base Acc@5 & 0.064 & 0.232 & 0.415 & 0.762 & 0.227 \\
+2.8B & 32 & early (1k) & Base Acc@10 & 0.088 & 0.296 & 0.497 & 0.848 & 0.283 \\
+2.8B & 32 & early (1k) & Comp. Acc@1 & 0.072 & 0.130 & 0.141 & 0.151 & 0.115 \\
+2.8B & 32 & early (1k) & Comp. Acc@5 & 0.187 & 0.333 & 0.379 & 0.402 & 0.300 \\
+2.8B & 32 & early (1k) & Comp. Acc@10 & 0.258 & 0.449 & 0.518 & 0.529 & 0.409 \\
+2.8B & 32 & mid (71k) & JSD & 0.155 & 0.115 & 0.071 & 0.041 & 0.114 \\
+2.8B & 32 & mid (71k) & TVD & 0.440 & 0.373 & 0.282 & 0.190 & 0.367 \\
+2.8B & 32 & mid (71k) & Jaccard@1 & 0.269 & 0.407 & 0.610 & 0.742 & 0.420 \\
+2.8B & 32 & mid (71k) & Jaccard@5 & 0.231 & 0.350 & 0.568 & 0.633 & 0.376 \\
+2.8B & 32 & mid (71k) & Jaccard@10 & 0.236 & 0.336 & 0.576 & 0.667 & 0.374 \\
+2.8B & 32 & mid (71k) & Base Acc@1 & 0.026 & 0.103 & 0.220 & 0.501 & 0.109 \\
+2.8B & 32 & mid (71k) & Base Acc@5 & 0.064 & 0.232 & 0.415 & 0.762 & 0.227 \\
+2.8B & 32 & mid (71k) & Base Acc@10 & 0.088 & 0.296 & 0.497 & 0.848 & 0.283 \\
+2.8B & 32 & mid (71k) & Comp. Acc@1 & 0.034 & 0.147 & 0.269 & 0.477 & 0.143 \\
+2.8B & 32 & mid (71k) & Comp. Acc@5 & 0.083 & 0.311 & 0.507 & 0.744 & 0.291 \\
+2.8B & 32 & mid (71k) & Comp. Acc@10 & 0.110 & 0.388 & 0.605 & 0.840 & 0.358 \\
+6.9B & 32 & early (1k) & JSD & 0.333 & 0.315 & 0.373 & 0.410 & 0.338 \\
+6.9B & 32 & early (1k) & TVD & 0.677 & 0.656 & 0.714 & 0.747 & 0.680 \\
+6.9B & 32 & early (1k) & Jaccard@1 & 0.069 & 0.075 & 0.118 & 0.163 & 0.086 \\
+6.9B & 32 & early (1k) & Jaccard@5 & 0.043 & 0.080 & 0.126 & 0.183 & 0.081 \\
+6.9B & 32 & early (1k) & Jaccard@10 & 0.039 & 0.087 & 0.135 & 0.228 & 0.084 \\
+6.9B & 32 & early (1k) & Base Acc@1 & 0.057 & 0.065 & 0.196 & 0.523 & 0.098 \\
+6.9B & 32 & early (1k) & Base Acc@5 & 0.155 & 0.157 & 0.359 & 0.780 & 0.213 \\
+6.9B & 32 & early (1k) & Base Acc@10 & 0.209 & 0.210 & 0.440 & 0.851 & 0.275 \\
+6.9B & 32 & early (1k) & Comp. Acc@1 & 0.046 & 0.053 & 0.100 & 0.130 & 0.065 \\
+6.9B & 32 & early (1k) & Comp. Acc@5 & 0.127 & 0.155 & 0.268 & 0.346 & 0.181 \\
+6.9B & 32 & early (1k) & Comp. Acc@10 & 0.172 & 0.226 & 0.366 & 0.466 & 0.251 \\
+6.9B & 32 & mid (71k) & JSD & 0.052 & 0.037 & 0.053 & 0.042 & 0.048 \\
+6.9B & 32 & mid (71k) & TVD & 0.252 & 0.211 & 0.241 & 0.191 & 0.235 \\
+6.9B & 32 & mid (71k) & Jaccard@1 & 0.470 & 0.589 & 0.650 & 0.757 & 0.566 \\
+6.9B & 32 & mid (71k) & Jaccard@5 & 0.413 & 0.525 & 0.572 & 0.625 & 0.501 \\
+6.9B & 32 & mid (71k) & Jaccard@10 & 0.419 & 0.549 & 0.601 & 0.660 & 0.520 \\
+6.9B & 32 & mid (71k) & Base Acc@1 & 0.057 & 0.065 & 0.196 & 0.523 & 0.098 \\
+6.9B & 32 & mid (71k) & Base Acc@5 & 0.155 & 0.157 & 0.359 & 0.780 & 0.213 \\
+6.9B & 32 & mid (71k) & Base Acc@10 & 0.209 & 0.210 & 0.440 & 0.851 & 0.275 \\
+6.9B & 32 & mid (71k) & Comp. Acc@1 & 0.074 & 0.089 & 0.251 & 0.498 & 0.130 \\
+6.9B & 32 & mid (71k) & Comp. Acc@5 & 0.196 & 0.223 & 0.465 & 0.747 & 0.285 \\
+6.9B & 32 & mid (71k) & Comp. Acc@10 & 0.262 & 0.290 & 0.558 & 0.843 & 0.360 \\
+12B & 36 & early (1k) & JSD & 0.371 & 0.336 & 0.360 & 0.421 & 0.354 \\
+12B & 36 & early (1k) & TVD & 0.715 & 0.679 & 0.701 & 0.754 & 0.697 \\
+12B & 36 & early (1k) & Jaccard@1 & 0.041 & 0.104 & 0.143 & 0.153 & 0.097 \\
+12B & 36 & early (1k) & Jaccard@5 & 0.031 & 0.080 & 0.134 & 0.177 & 0.081 \\
+12B & 36 & early (1k) & Jaccard@10 & 0.029 & 0.074 & 0.136 & 0.220 & 0.079 \\
+12B & 36 & early (1k) & Base Acc@1 & 0.042 & 0.055 & 0.241 & 0.540 & 0.108 \\
+12B & 36 & early (1k) & Base Acc@5 & 0.117 & 0.132 & 0.430 & 0.785 & 0.222 \\
+12B & 36 & early (1k) & Base Acc@10 & 0.164 & 0.176 & 0.500 & 0.851 & 0.275 \\
+12B & 36 & early (1k) & Comp. Acc@1 & 0.032 & 0.031 & 0.083 & 0.124 & 0.048 \\
+12B & 36 & early (1k) & Comp. Acc@5 & 0.086 & 0.129 & 0.233 & 0.309 & 0.149 \\
+12B & 36 & early (1k) & Comp. Acc@10 & 0.115 & 0.180 & 0.322 & 0.421 & 0.205 \\
+12B & 36 & mid (71k) & JSD & 0.060 & 0.038 & 0.059 & 0.041 & 0.053 \\
+12B & 36 & mid (71k) & TVD & 0.268 & 0.217 & 0.254 & 0.188 & 0.247 \\
+12B & 36 & mid (71k) & Jaccard@1 & 0.374 & 0.537 & 0.589 & 0.748 & 0.500 \\
+12B & 36 & mid (71k) & Jaccard@5 & 0.385 & 0.491 & 0.539 & 0.646 & 0.471 \\
+12B & 36 & mid (71k) & Jaccard@10 & 0.402 & 0.509 & 0.542 & 0.660 & 0.483 \\
+12B & 36 & mid (71k) & Base Acc@1 & 0.042 & 0.055 & 0.241 & 0.540 & 0.108 \\
+12B & 36 & mid (71k) & Base Acc@5 & 0.117 & 0.132 & 0.430 & 0.785 & 0.222 \\
+12B & 36 & mid (71k) & Base Acc@10 & 0.164 & 0.176 & 0.500 & 0.851 & 0.275 \\
+12B & 36 & mid (71k) & Comp. Acc@1 & 0.057 & 0.103 & 0.321 & 0.511 & 0.157 \\
+12B & 36 & mid (71k) & Comp. Acc@5 & 0.162 & 0.268 & 0.561 & 0.774 & 0.328 \\
+12B & 36 & mid (71k) & Comp. Acc@10 & 0.220 & 0.348 & 0.649 & 0.849 & 0.404 \\
+\bottomrule
+\end{tabular}
+}
+\end{table}

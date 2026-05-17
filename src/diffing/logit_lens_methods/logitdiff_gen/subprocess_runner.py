@@ -29,6 +29,7 @@ from .core import (
 
 def _collect_single_model_worker(worker_config: Dict[str, Any]) -> None:
     model_path = worker_config["model_path"]
+    tokenizer_id = worker_config.get("tokenizer_id") or model_path
     adapter_path = worker_config.get("adapter_path")
     chat_template = worker_config.get("chat_template")
     prompt = worker_config["prompt"]
@@ -36,7 +37,7 @@ def _collect_single_model_worker(worker_config: Dict[str, Any]) -> None:
     layer_indices = [int(v) for v in worker_config["layer_indices"]]
     max_k = int(worker_config["max_k"])
 
-    tokenizer = load_tokenizer(model_path, chat_template=chat_template)
+    tokenizer = load_tokenizer(tokenizer_id, chat_template=chat_template)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -147,7 +148,8 @@ def run_logitdiff_subprocess_sequential(
 
     comparison_model_path = comparison_model_path or base_model_path
 
-    tokenizer = load_tokenizer(base_model_path)
+    tokenizer_source = config.tokenizer_id or base_model_path
+    tokenizer = load_tokenizer(tokenizer_source)
     model_cfg = AutoConfig.from_pretrained(base_model_path)
     num_hidden_layers = int(getattr(model_cfg, "num_hidden_layers"))
     wrapper_probe = type("TokenizerProbe", (), {"blocks": [None] * num_hidden_layers})()
@@ -180,6 +182,7 @@ def run_logitdiff_subprocess_sequential(
         )
         worker_common = {
             "model_path": base_model_path,
+            "tokenizer_id": tokenizer_source,
             "chat_template": base_template,
             "prompt": prompt,
             "layer_indices": layer_indices,

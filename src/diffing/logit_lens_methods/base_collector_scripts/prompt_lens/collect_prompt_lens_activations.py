@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import argparse
 import gc
+import importlib.util
 import json
 from pathlib import Path
+from typing import Any
 
 import torch
 from peft import PeftModel
@@ -37,6 +39,28 @@ def _clear_cache() -> None:
         torch.cuda.synchronize()
 
 
+def _load_quantization_config(
+    *,
+    config_name: str | None,
+    config_source: str | None,
+) -> Any | None:
+    if not config_name:
+        return None
+    if not config_source:
+        raise ValueError("quantization_config_source is required when quantization_config_name is set")
+    source_path = Path(config_source)
+    if not source_path.exists():
+        raise FileNotFoundError(f"quantization config source not found: {source_path}")
+    spec = importlib.util.spec_from_file_location("prompt_lens_quant_config", source_path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Could not load quantization config source: {source_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if not hasattr(module, config_name):
+        raise AttributeError(f"{source_path} does not define {config_name}")
+    return getattr(module, config_name)
+
+
 def _extract_final_norm_metadata(module: torch.nn.Module | None) -> dict[str, Any] | None:
     if module is None:
         return None
@@ -55,12 +79,16 @@ def run_collection(
     output_dir: Path,
     output_stem: str,
     model_id: str,
+    model_revision: str | None = None,
     adapter_path: str | None,
     tokenizer_id: str | None,
+    tokenizer_revision: str | None = None,
     dtype_name: str,
     trust_remote_code: bool,
     force_cpu: bool,
     save_logits: bool,
+    quantization_config_name: str | None = None,
+    quantization_config_source: str | None = None,
     model_key: str = "prompt_lens",
 ) -> dict:
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -70,7 +98,7 @@ def run_collection(
 
     _clear_cache()
     dtype = _resolve_dtype(dtype_name)
-    tokenizer = load_tokenizer(tokenizer_id or model_id)
+    tokenizer = load_tokenizer(tokenizer_id or model_id, revision=tokenizer_revision or model_revision)
     if tokenizer.pad_token is None:
         tokenizer.pad_token = tokenizer.eos_token
 
@@ -78,8 +106,19 @@ def run_collection(
         "torch_dtype": dtype,
         "trust_remote_code": trust_remote_code,
     }
+    if model_revision is not None:
+        model_kwargs["revision"] = model_revision
     if force_cpu:
         model_kwargs["device_map"] = "cpu"
+    else:
+        model_kwargs["device_map"] = "auto"
+
+    quantization_config = _load_quantization_config(
+        config_name=quantization_config_name,
+        config_source=quantization_config_source,
+    )
+    if quantization_config is not None:
+        model_kwargs["quantization_config"] = quantization_config
 
     model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
     if adapter_path:
@@ -127,12 +166,16 @@ def run_collection(
         "output_path": str(output_path),
         "partial_path": str(partial_path),
         "model_id": model_id,
+        "model_revision": model_revision,
         "adapter_path": adapter_path,
         "tokenizer_id": tokenizer_id,
+        "tokenizer_revision": tokenizer_revision,
         "dtype": dtype_name,
         "trust_remote_code": trust_remote_code,
         "force_cpu": force_cpu,
         "save_logits": save_logits,
+        "quantization_config_name": quantization_config_name,
+        "quantization_config_source": quantization_config_source,
         "num_rows_completed": int(payload.get("num_rows_completed", 0)),
         "num_examples": int(payload.get("num_examples", 0)),
         "norm_modes": payload.get("norm_modes", []),
@@ -147,12 +190,16 @@ def main() -> None:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--output-stem", required=True)
     parser.add_argument("--model-id", required=True)
+    parser.add_argument("--model-revision", default=None)
     parser.add_argument("--adapter-path", default=None)
     parser.add_argument("--tokenizer-id", default=None)
+    parser.add_argument("--tokenizer-revision", default=None)
     parser.add_argument("--dtype", default="bfloat16")
     parser.add_argument("--trust-remote-code", action="store_true")
     parser.add_argument("--force-cpu", action="store_true")
     parser.add_argument("--save-logits", action="store_true")
+    parser.add_argument("--quantization-config-name", default=None)
+    parser.add_argument("--quantization-config-source", default=None)
     parser.add_argument("--model-key", default="prompt_lens")
     args = parser.parse_args()
 
@@ -161,12 +208,16 @@ def main() -> None:
         output_dir=args.output_dir,
         output_stem=args.output_stem,
         model_id=args.model_id,
+        model_revision=args.model_revision,
         adapter_path=args.adapter_path,
         tokenizer_id=args.tokenizer_id,
+        tokenizer_revision=args.tokenizer_revision,
         dtype_name=args.dtype,
         trust_remote_code=args.trust_remote_code,
         force_cpu=args.force_cpu,
         save_logits=args.save_logits,
+        quantization_config_name=args.quantization_config_name,
+        quantization_config_source=args.quantization_config_source,
         model_key=args.model_key,
     )
     print(json.dumps(summary, indent=2))

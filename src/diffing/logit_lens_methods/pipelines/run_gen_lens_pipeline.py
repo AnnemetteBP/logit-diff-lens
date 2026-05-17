@@ -22,6 +22,7 @@ def _is_local_path_ref(value: str | None) -> bool:
 @dataclass
 class GenLensConfig:
     prompt_source: Path
+    tokenizer_id: str | None = None
     prompt_key: str = "prompt"
     max_new_tokens: int = 14
     top_k: int = 10
@@ -93,6 +94,7 @@ def _make_prompt_metadata(rows: list[dict[str, Any]], template_name: str) -> lis
 def _parse_gen_lens_config(raw: dict[str, Any]) -> GenLensConfig:
     return GenLensConfig(
         prompt_source=Path(raw["prompt_source"]),
+        tokenizer_id=raw.get("tokenizer_id"),
         prompt_key=raw.get("prompt_key", "prompt"),
         max_new_tokens=int(raw.get("max_new_tokens", 14)),
         top_k=int(raw.get("top_k", 10)),
@@ -119,6 +121,7 @@ def _build_gen_config(rows: list[dict[str, Any]], cfg: GenLensConfig, scenario: 
     return LogitDiffRunConfig(
         prompts=prompts,
         prompt_metadata=_make_prompt_metadata(rows, cfg.template_name),
+        tokenizer_id=cfg.tokenizer_id,
         layers=cfg.layers,
         top_k=cfg.top_k,
         comparison_top_ks=cfg.comparison_top_ks,
