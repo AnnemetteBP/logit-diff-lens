@@ -4,7 +4,7 @@
 
 ## Overview
 
-Comparison artifacts are the main way `LogitDiff` turns two saved runs into a user-facing analysis result. They make it easy to compare systems, readouts, or settings and then visualize where they diverge.
+Comparison artifacts are the main way `LogitDiff` turns two saved runs into a user-facing analysis result. They make it easy to compare systems, readouts, or settings and then visualize where they diverge in prompt-lens or prompt-side analysis, while the same comparison ideas also extend to generation-lens studies.
 
 ## Wrappers and normalization
 
@@ -24,6 +24,7 @@ Use a comparison artifact when you want to:
 
 - compare two models on the same prompt
 - compare two runs over batches or datasets
+- compare the same model under different prompting or decoding conditions
 - compare two readout settings such as `ModelNorm` and `Tuned Lens`
 - create a heatmap from saved prompt captures
 - find positions or layers with large divergence
@@ -37,20 +38,22 @@ Use a comparison artifact when you want to:
 
 ## What it gives back
 
-It saves the comparison result and can also export a figure such as a PDF heatmap.
+It saves the comparison result and can also export a figure such as a PDF or interactive Plotly heatmap.
 
 ## Example command
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
-  --ft-artifact tmp/artifacts/ft_capture.pt \
-  --base-artifact tmp/artifacts/base_capture.pt \
-  --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \
+  --ft-artifact tmp/artifacts/<run-a>.pt \
+  --base-artifact tmp/artifacts/<run-b>.pt \
+  --comparison-output tmp/artifacts/<comparison-name>.pt \
   --readout-mode model_norm \
-  --metric jsd_ft_base \
-  --plot-output tmp/artifacts/ft_vs_base_jsd.pdf
+  --metric topk_jaccard_ft_base \
+  --plot-output tmp/artifacts/<comparison-name>.html
 ```
 
 ## How to interpret the result
 
-The saved comparison tells you where two systems come apart across tokens and layers. In batched or dataset-style analysis, the important point is to read only meaningful token positions and avoid treating masked or padded positions as real evidence.
+The saved comparison tells you where two systems come apart across tokens and layers. In batched or dataset-style analysis, the important point is to read only meaningful token positions and avoid treating masked or padded positions as real evidence. Jaccard-style heatmaps are especially useful when you care about overlap in top predictions rather than only probability divergence.
+
+For explicit prompt-heatmap and generation-heatmap plotting paths, see [README_heatmaps.md](/media/am/AM/logit-diff-lens/docs/README_heatmaps.md).

@@ -4,7 +4,7 @@
 
 ## Overview
 
-Backward artifacts capture how a chosen target token sends signal backward through the model. This gives a different view from forward lens analysis and is useful when you want to study target-conditioned behavior rather than only layerwise predictions.
+Backward artifacts capture how a chosen target token sends signal backward through the model. This gives a different view from forward lens analysis and is useful when you want to study target-conditioned behavior rather than only layerwise predictions. The same idea can support prompt-lens or generation-lens questions depending on which target behavior you choose to analyze.
 
 ## When to use it
 
@@ -14,6 +14,7 @@ Use backward artifacts when you want to:
 - compare forward and backward views of the same example
 - analyze which layers matter for a chosen target token
 - explore attribution-style analysis inside `LogitDiff`
+- connect prompt-side or generation-side behavior to backward signals
 
 ## What you give it
 
@@ -30,11 +31,11 @@ It saves a backward analysis result tied to that prompt and chosen target token.
 
 ```bash
 PYTHONPATH=src python pipelines/capture_backward_artifact.py \
-  --model-name EleutherAI/pythia-70m-deduped \
-  --prompt "Paris is the capital of" \
-  --target-token-text " France" \
-  --output-path tmp/artifacts/paris_backward.pt \
-  --dtype bfloat16
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --target-token-text "<target-token>" \
+  --output-path tmp/artifacts/<backward-run>.pt \
+  --dtype <dtype>
 ```
 
 ## How to interpret the result

@@ -9,14 +9,18 @@ These guides explain the main `LogitDiff` workflows for readers, users, and pape
 - [Forward Capture](README_forward_capture_artifacts.md)
   Learn how to save prompt activations for single prompts, batches, or dataset-style runs.
 - [Comparison Artifacts](README_comparison_artifacts.md)
-  Compare two systems and turn the result into heatmaps and token-level analysis.
+  Compare two systems and turn the result into heatmaps and token-level analysis for prompt or generation studies.
+- [Generation Lens](README_generation_lens.md)
+  Follow divergence during actual continuation as a generation-time logit-lens analysis.
+- [Heatmaps](README_heatmaps.md)
+  Plot prompt-lens and generation-lens heatmaps for metrics such as JSD and top-k Jaccard.
 
 ## Analysis Guides
 
 - [Patchscopes](README_patchscopes.md)
-  Explore how a chosen representation changes a target prompt when it is patched in.
+  Explore how a chosen representation changes a target run when it is patched in.
 - [Logit Prisms](README_logit_prisms.md)
-  Break a prediction or divergence into embedding, attention, MLP, and full-stream views.
+  Break a prediction or divergence into embedding, attention, MLP, and full-stream views across prompt or generation analysis.
 - [Backward Artifacts](README_backward_artifacts.md)
   Inspect target-conditioned backward signals for a chosen prompt and token.
 - [Weight and Vocabulary Methods](README_model_weight_vocab_methods.md)

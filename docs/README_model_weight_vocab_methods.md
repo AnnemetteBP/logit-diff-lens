@@ -4,7 +4,7 @@
 
 ## Overview
 
-This part of `LogitDiff` focuses on interpreting directions in weights, hidden states, and logits by projecting them into vocabulary space. It is useful when you want a more semantic view of what a direction, update, or difference appears to mean.
+This part of `LogitDiff` focuses on interpreting directions in weights, hidden states, and logits by projecting them into vocabulary space. It is useful when you want a more semantic view of what a direction, update, or difference appears to mean in prompt-lens or generation-lens analysis.
 
 ## Wrappers and normalization
 
@@ -41,12 +41,12 @@ It gives you token-level summaries and direction-level interpretations that are 
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
-  --ft-artifact tmp/artifacts/ft_capture.pt \
-  --base-artifact tmp/artifacts/base_capture.pt \
-  --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \
+  --ft-artifact tmp/artifacts/<run-a>.pt \
+  --base-artifact tmp/artifacts/<run-b>.pt \
+  --comparison-output tmp/artifacts/<comparison-name>.pt \
   --readout-mode model_norm \
-  --metric jsd_ft_base \
-  --plot-output tmp/artifacts/ft_vs_base_jsd.pdf
+  --metric topk_jaccard_ft_base \
+  --plot-output tmp/artifacts/<comparison-name>.html
 ```
 
 ## How to interpret the result
