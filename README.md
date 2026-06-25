@@ -8,7 +8,7 @@
 
 LogitDiff Lens is a research toolkit for comparing model behavior across prompts, generations, layers, tokens, and readout methods.
 
-It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models.
+It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models. `LogitDiff` includes both prompt-lens and generation-lens workflows as part of the same main project.
 
 ![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
@@ -133,6 +133,23 @@ PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --output-path tmp/artifacts/<patchscope-run>.pt
 ```
 
+### 6. Run a generation-lens config
+
+```bash
+PYTHONPATH=src python pipelines/<pipeline-group>/run_gen_lens.py \
+  --config configs/<group>/gen_lens/<config-name>.json
+```
+
+### 7. Run a generation patchscope
+
+```bash
+PYTHONPATH=src python pipelines/run_patchscope_generation.py \
+  --base-model-id <base-model-name> \
+  --comparison-model-id <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<generation-patchscope-run>.json
+```
+
 ## Main workflows
 
 ### Wrappers and readouts
@@ -142,10 +159,14 @@ PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
 In practice, the wrapper layer is what makes it possible to:
 
 - run prompt lens and generation lens workflows through the same toolkit
+- run custom generation and patching workflows through the same toolkit
 - run single prompts, batches, and dataset-style analysis through the same toolkit
 - handle special tokens and attention masks consistently
+- keep tokenization and continuation formatting consistent across prompt and generation workflows
 - ignore meaningless padded positions in downstream analysis
 - compare readout choices such as raw, `ModelNorm`, `Tuned Lens`, and bias-only modes
+
+The wrapper layer also carries prompt-format behavior such as plain prompts, chat templates, prefix-style prompting, and optional system prompts.
 
 ### Normalization choices
 
@@ -188,6 +209,8 @@ The prompt capture path currently preserves what is needed for both `raw` and `M
 3. Patch that representation into a target prompt run at a chosen layer/position.
 4. Save a patchscope artifact for later decoding, comparison, or sweep aggregation.
 
+Generation-focused patchscope and patch-sweep analyses are also part of the broader `LogitDiff Lens` workflow family, using the same wrapper and activation concepts for continuation-time interventions.
+
 ### Dataset and batching workflow
 
 1. Run prompt capture or comparison over prompt sets rather than only one prompt.
@@ -202,6 +225,8 @@ The prompt capture path currently preserves what is needed for both `raw` and `M
 3. Export `.html` when you want an interactive Plotly figure.
 4. Export `.pdf` when you want a static figure for a report or paper.
 
+For generation-lens runs, the public plotting surface is available through `logit_diff_lens.plotting`, including the generation heatmap helpers.
+
 ## Documentation map
 
 - [docs/README.md](docs/README.md)
@@ -210,8 +235,10 @@ The prompt capture path currently preserves what is needed for both `raw` and `M
   Save prompt captures for later analysis.
 - [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
   Compare two saved runs and create divergence plots.
+- [docs/README_wrappers.md](docs/README_wrappers.md)
+  See the prompt, generation, custom-generation, and patching wrappers together with readout choices.
 - [docs/README_generation_lens.md](docs/README_generation_lens.md)
-  Run generation-lens analyses over actual continuations.
+  Run generation-lens analyses over actual continuations, templates, and alternate prompting conditions.
 - [docs/README_heatmaps.md](docs/README_heatmaps.md)
   Plot prompt-lens and generation-lens heatmaps.
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)

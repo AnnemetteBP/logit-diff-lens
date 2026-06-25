@@ -4,7 +4,7 @@
 
 ## Overview
 
-Heatmaps are one of the main ways to inspect `LogitDiff` results. They show how a metric changes across layers and token positions, either for prompt-lens analysis or for generation-lens analysis.
+Heatmaps are one of the main ways to inspect `LogitDiff` results. `LogitDiff` covers both prompt-lens and generation-lens analysis, and the heatmaps show how a metric changes across layers and token positions in either case.
 
 ## Prompt lens and generation lens
 
@@ -47,16 +47,15 @@ PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
 
 ## Generation heatmap example
 
-```bash
-python - <<'PY'
+```python
 from pathlib import Path
-from src.logit_diff_lens._legacy.logitdiff_toolkit.logit_lens_methods.plotting.heatmaps.logitdiff_gen_plotter import save_logitdiff_heatmap_html
+
+from logit_diff_lens.plotting.logitdiff_gen_plotter import save_logitdiff_heatmap_html
 
 save_logitdiff_heatmap_html(
     "tmp/<generation-run>/<layerwise-json>.json",
     Path("tmp/<generation-run>/figures/<generation-heatmap>.html"),
 )
-PY
 ```
 
 ## How to interpret the result
@@ -65,5 +64,6 @@ Read the heatmap as a layer-by-position or layer-by-step view.
 
 - In prompt lens, strong regions show where the fixed prompt carries the biggest difference.
 - In generation lens, strong regions show where the continuation starts to diverge or where top-token overlap weakens over time.
+- In template-conditioned generation analysis, strong regions can show where changing the template, prefix, or system prompt begins to alter the continuation trajectory.
 
 Jaccard-style heatmaps are especially useful when you care about overlap in top predictions, while JSD-style heatmaps are more useful when you care about full-distribution divergence.

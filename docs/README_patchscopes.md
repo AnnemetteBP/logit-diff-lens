@@ -40,6 +40,8 @@ They are useful in both:
 
 This includes the kind of generation-focused patchscope analysis used in paper-style case studies, where a chosen high-difference token or layer is patched across positions to see how the continuation changes.
 
+Generation-focused patching is also useful when you want to compare the same model under different generation conditions such as template choice, prefix formatting, or system-prompt changes.
+
 ## Example command
 
 ```bash
@@ -53,6 +55,29 @@ PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --target-position <target-position> \
   --readout-mode model_norm \
   --output-path tmp/artifacts/<patchscope-run>.pt
+```
+
+## Generation patchscope example
+
+```bash
+PYTHONPATH=src python pipelines/run_patchscope_generation.py \
+  --base-model-id <base-model-name> \
+  --comparison-model-id <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<generation-patchscope-run>.json \
+  --use-chat-template \
+  --system-prompt "<system-prompt>" \
+  --num-generated-positions 4
+```
+
+## Generation patch sweep example
+
+```bash
+PYTHONPATH=src python pipelines/run_patchscope_generation_sweep.py \
+  --base-model-id <base-model-name> \
+  --comparison-model-id <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<generation-patch-sweep>.json
 ```
 
 ## How to interpret the result
