@@ -136,7 +136,11 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
         self,
         texts:str|List[str],
         device:str|None=None,
-        add_special_tokens:bool=True
+        add_special_tokens:bool=True,
+        padding: bool | str | None = None,
+        truncation: bool = False,
+        max_length: int | None = None,
+        **tokenizer_kwargs,
     ) -> Dict[str, torch.Tensor]:
 
         try:
@@ -149,8 +153,11 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
         inputs = self.tokenizer(
             texts,
             return_tensors="pt",
-            padding=isinstance(texts, list),
-            add_special_tokens=add_special_tokens
+            padding=isinstance(texts, list) if padding is None else padding,
+            truncation=truncation,
+            max_length=max_length,
+            add_special_tokens=add_special_tokens,
+            **tokenizer_kwargs,
         )
 
         return {

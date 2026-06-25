@@ -6,34 +6,15 @@
 ![Plotly](https://img.shields.io/badge/Plotly-visualization-3f4f75)
 ![Status](https://img.shields.io/badge/status-active%20research-2ea44f)
 
-LogitDiff Lens is a research toolkit for comparing model behavior across prompts, generations, layers, tokens, and readout methods.
+`LogitDiff` is a research toolkit for prompt-lens, generation-lens, comparison, intervention, and vocabulary-space analysis in transformer language models.
 
-It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models. `LogitDiff` includes both prompt-lens and generation-lens workflows as part of the same main project, and the wrapper layer is part of that core toolkit rather than a separate add-on.
+It keeps prompt-side and generation-side workflows under one project, with wrapper types handling tokenization, attention masks, normalization, LM-head projection, and artifact reuse across analyses.
 
 ![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
-## What this repository is for
-
-This project aims to provide a strong base for:
-
-- forward logit-lens analyses
-- tuned / ModelNorm / raw / bias-only comparisons
-- differential analyses such as `ft - base`
-- prompt and generation lens workflows
-- single-prompt, batched, and dataset-level analysis
-- attention-mask-aware and padding-aware processing
-- special-token-aware prompt handling
-- patchscope interventions and patchscope sweeps
-- logit prisms and subblock decomposition
-- weight- and vocabulary-space methods such as SVD-based analysis
-- backward-pass, target-conditioned artifact capture
-- future quantization, MoE, and low-rank adapter analysis
-
 ## Installation
 
-This repository is currently structured for research development rather than polished package release.
-
-Typical setup:
+Standard install:
 
 ```bash
 cd logit-diff-lens
@@ -43,7 +24,7 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
-Development setup:
+Development install:
 
 ```bash
 cd logit-diff-lens
@@ -53,7 +34,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-If you want the local upstream packages bundled into the same environment as well:
+Install with the local upstream repositories bundled into the same environment:
 
 ```bash
 cd logit-diff-lens
@@ -63,72 +44,243 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev,local_upstreams]"
 ```
 
-The main optional install groups are:
+## Main workflows
 
-- `dev` for test and lint tooling
-- `local_upstreams` for the local `nnsight`, `tuned-lens`, and `TransformerLens` repositories
-- `dictionary_learning` for dictionary-learning extras
+### Prompt capture
 
-## Quickstart
-
-These quickstart examples use single prompts because they are the shortest way to show the workflow. The toolkit is not limited to single-prompt runs and is intended to support prompt sets, batches, datasets, and generation-oriented analysis as well.
-
-Placeholder conventions used below:
-
-- `<model-name>`, `<base-model-name>`, `<comparison-model-name>`: string model identifiers or local model paths
-- `<prompt-text>`, `<target-prompt>`, `<target-token>`: strings
-- `<dtype>`: string such as `bfloat16`, `float16`, or `float32`
-- `<config-name>`: config filename stem
-- `<source-layer>`, `<target-layer>`: integer layer indices
-- `<source-position>`, `<target-position>`: integer token positions
-- `<run-name>`, `<comparison-name>`: output name strings
-
-### 1. Capture a prompt run
+Single prompt:
 
 ```bash
 PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --model-name <model-name> \
   --prompt "<prompt-text>" \
   --output-path tmp/artifacts/<run-name>.pt \
-  --dtype <dtype> \
-  --force-include-output
+  --dtype bfloat16 \
+  --use-chat-template \
+  --prompt-format chat_template \
+  --system-prompt "<system-prompt>" \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw model_norm \
+  --collect-components
 ```
 
-### 2. Capture a dataset-style run
+Dataset-style prompt capture:
 
 ```bash
 PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --model-name <model-name> \
   --dataset-path <dataset.jsonl> \
-  --text-field <text-field> \
+  --text-field text \
   --output-path tmp/artifacts/<dataset-run>.pt \
-  --dtype <dtype>
+  --dtype bfloat16 \
+  --prompt-format plain \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --force-include-input \
+  --norm-modes raw model_norm
 ```
 
-### 3. Compare saved runs and export an interactive Plotly heatmap
+### Prompt comparison
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
-  --ft-artifact tmp/artifacts/<run-a>.pt \
-  --base-artifact tmp/artifacts/<run-b>.pt \
-  --comparison-output tmp/artifacts/<comparison-name>.pt \
-  --readout-mode model_norm \
-  --metric topk_jaccard_ft_base \
-  --plot-output tmp/artifacts/<comparison-name>.html
+  --ft-artifact tmp/artifacts/<ft-run>.pt \
+  --base-artifact tmp/artifacts/<base-run>.pt \
+  --comparison-output tmp/artifacts/<comparison-run>.pt \
+  --readout-mode model_norm
 ```
 
-### 4. Capture a backward-pass artifact
+### Prompt and generation heatmaps
+
+Prompt heatmaps and generation heatmaps share the same overall workflow surface:
+
+- plot from a saved payload
+- or compute live and plot from the same command
+- keep capture or generation controls on the same surface as the plotting controls
+
+Common plotting controls include `--plot-kind`, `--prompt-index`, `--top-k`, `--display-top-tokens`, `--visible-cell-tokens`, `--start-position`, `--end-position`, `--max-layers`, `--max-divergent-layers`, `--layer-selection`, `--keep-last-layer-fraction`, `--title`, `--colorscale`, and `--show-marginals`.
+
+Prompt saved-payload mode:
 
 ```bash
-PYTHONPATH=src python pipelines/capture_backward_artifact.py \
-  --model-name <model-name> \
-  --prompt "<prompt-text>" \
-  --target-token-text "<target-token>" \
-  --output-path tmp/artifacts/<backward-run>.pt \
-  --dtype <dtype>
+PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
+  --input-path tmp/<prompt-results>.json \
+  --output-path tmp/artifacts/<prompt-heatmap>.pdf \
+  --plot-kind jaccard \
+  --prompt-index 0 \
+  --analysis-topk 10 \
+  --top-k 10 \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode base_generated \
+  --title "Prompt Jaccard" \
+  --colorscale RdBu \
+  --show-marginals
 ```
 
-### 5. Run a prompt-first patchscope intervention
+Prompt live compute mode:
+
+```bash
+PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
+  --model-name <base-model-name> \
+  --comparison-model-name <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<prompt-heatmap>.pdf \
+  --plot-kind jaccard \
+  --prompt-index 0 \
+  --analysis-topk 10 \
+  --top-k 10 \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode base_generated \
+  --title "Prompt Jaccard" \
+  --colorscale RdBu \
+  --show-marginals \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw model_norm
+```
+
+For saved prompt comparison artifacts, the same wrapper also exposes `--plot-kind comparison_metric` with `--metric <metric-name>`.
+
+Generation saved-payload mode:
+
+```bash
+PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
+  --input-path tmp/<run-root>/data/<layerwise-json>.json \
+  --output-path tmp/<run-root>/figures/<generation-heatmap>.pdf \
+  --plot-kind jaccard \
+  --prompt-index 0 \
+  --analysis-topk 10 \
+  --top-k 10 \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode ft_generated \
+  --x-tick-mode-secondary base_generated \
+  --title "Generation LogitDiff" \
+  --colorscale RdBu \
+  --show-marginals
+```
+
+Generation live compute mode:
+
+```bash
+PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
+  --model-name <base-model-name> \
+  --comparison-model-name <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/<run-root>/figures/<generation-heatmap>.pdf \
+  --plot-kind jaccard \
+  --prompt-index 0 \
+  --analysis-topk 10 \
+  --top-k 10 \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode ft_generated \
+  --x-tick-mode-secondary base_generated \
+  --title "Generation LogitDiff" \
+  --colorscale RdBu \
+  --show-marginals \
+  --force-include-input \
+  --force-include-output \
+  --max-new-tokens 32 \
+  --batch-size 8 \
+  --norm-modes raw unit_norm eps_norm model_norm
+```
+
+### Generation lens
+
+Config-driven generation runs already in the repo:
+
+```bash
+PYTHONPATH=src python pipelines/em_qwen/run_gen_lens.py \
+  --config configs/em_qwen/gen_lens/chat_template/risky_14.json
+```
+
+```bash
+PYTHONPATH=src python pipelines/quant_llama/run_gen_lens.py \
+  --config configs/quant_llama/gen_lens/hf1bit_14.json
+```
+
+Those generation configs are where generation-side inputs such as prompt source, formatting, template choice, sampling, and comparison settings are stored.
+
+### Direct generation capture
+
+Single prompt:
+
+```bash
+PYTHONPATH=src python pipelines/capture_generation_artifacts.py \
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<generation-run>.pt \
+  --dtype bfloat16 \
+  --prompt-format plain \
+  --system-prompt "<system-prompt>" \
+  --analyze-special-tokens \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --max-new-tokens 32 \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw unit_norm eps_norm model_norm \
+  --collect-components
+```
+
+Dataset-style generation capture:
+
+```bash
+PYTHONPATH=src python pipelines/capture_generation_artifacts.py \
+  --model-name <model-name> \
+  --dataset-path <dataset.jsonl> \
+  --text-field analysis_text \
+  --label-field label \
+  --output-path tmp/artifacts/<generation-dataset-run>.pt \
+  --dtype bfloat16 \
+  --use-chat-template \
+  --prompt-format chat_template \
+  --system-prompt "<system-prompt>" \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --max-new-tokens 32 \
+  --batch-size 8 \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw unit_norm eps_norm model_norm \
+  --collect-components
+```
+
+### Patchscopes
+
+Prompt patchscope:
 
 ```bash
 PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
@@ -143,14 +295,7 @@ PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --output-path tmp/artifacts/<patchscope-run>.pt
 ```
 
-### 6. Run a generation-lens config
-
-```bash
-PYTHONPATH=src python pipelines/<pipeline-group>/run_gen_lens.py \
-  --config configs/<group>/gen_lens/<config-name>.json
-```
-
-### 7. Run a generation patchscope
+Generation patchscope:
 
 ```bash
 PYTHONPATH=src python pipelines/run_patchscope_generation.py \
@@ -160,130 +305,48 @@ PYTHONPATH=src python pipelines/run_patchscope_generation.py \
   --output-path tmp/artifacts/<generation-patchscope-run>.json
 ```
 
-## Main workflows
+## Wrappers, masks, and readouts
 
-### Core LogitDiff infrastructure
-
-The wrapper layer is part of `LogitDiff` itself. It is the shared infrastructure that exposes models, tokenization, masking, readout choices, prompt formatting, and patching behavior in a consistent way across the toolkit.
-
-The main wrapper surfaces are:
+The core wrapper surfaces are:
 
 - `LogitLensWrapper`
 - `GenerateLensWrapper`
 - `CustomGenerationLensWrapper`
 - `PatchingLensWrapper`
 
-What those wrappers are responsible for:
+Prompt lens and generation lens are wrapper-backed modes inside the same toolkit:
 
-- prompt-lens and generation-lens forwarding under one toolkit surface
-- custom generation and intervention workflows
-- tokenization and prompt formatting for `plain`, `chat_template`, and prefix-style prompting
-- optional `system_prompt` handling when the workflow uses it
-- attention-mask-aware execution
-- padding-aware filtering of meaningless token positions in downstream analysis
-- special-token-aware decoding and token display
-- reusable hidden-state exposure across heatmaps, patchscopes, prisms, and comparisons
-- readout choices such as `raw`, `ModelNorm`, `Tuned Lens`, and bias-oriented variants
-- keeping prompt-side and generation-side analyses aligned to the same model interface
+- prompt lens uses `LogitLensWrapper`
+- generation lens uses `GenerateLensWrapper` or `CustomGenerationLensWrapper`
+- patchscope and intervention workflows use `PatchingLensWrapper` together with saved artifacts
 
-### Wrappers and readouts
+They are responsible for:
 
-`LogitDiff Lens` relies on wrappers to provide a consistent interface across models, tokenizers, devices, masking behavior, and readout methods.
+- prompt and generation forwarding
+- prompt formatting for `plain`, `chat_template`, and `user_assistant_prefix`
+- optional `system_prompt`
+- special-token-aware tokenization
+- attention-mask-aware trimming
+- configurable truncation, max length, and padding
+- padding-aware downstream analysis
+- consistent LM-head projection and normalization handling
 
-In practice, the wrapper layer is what makes it possible to:
+The prompt-side capture path currently preserves what is needed for:
 
-- run prompt lens and generation lens workflows through the same toolkit
-- run custom generation and patching workflows through the same toolkit
-- run single prompts, batches, and dataset-style analysis through the same toolkit
-- handle special tokens and attention masks consistently
-- keep tokenization and continuation formatting consistent across prompt and generation workflows
-- ignore meaningless padded positions in downstream analysis
-- compare readout choices such as raw, `ModelNorm`, `Tuned Lens`, and bias-only modes
+- `raw`
+- `model_norm`
 
-The wrapper layer also carries prompt-format behavior such as plain prompts, chat templates, prefix-style prompting, and optional system prompts.
+External tuned-lens comparisons are handled as a separate learned readout workflow.
 
-### Normalization choices
-
-Readout choice matters because the same hidden state can look very different depending on how it is decoded.
-
-The main user-facing distinction is:
-
-- `raw`: decode the hidden state directly
-- `ModelNorm`: apply the model's own final normalization before decoding
-- `Tuned Lens`: use a learned readout that adjusts intermediate states before decoding
-
-If you are comparing readouts, it is worth treating normalization as part of the method rather than as a minor implementation detail.
-
-The prompt capture path currently preserves what is needed for both `raw` and `ModelNorm` readouts, and the comparison path lets you switch between them with `--readout-mode`.
-
-### Forward capture workflow
-
-1. Capture prompt artifacts once.
-2. Analyze them directly or reuse them across downstream readouts and plots.
-3. Save comparisons and figures without rerunning the same forward pass every time.
-
-### Differential workflow
-
-1. Capture or load the runs you want to compare.
-2. Compare them with the ordering you want to study, such as `ft - base`.
-3. Compute metrics such as JSD, KL, Jaccard, rank deltas, and hidden-space distances.
-4. Plot directly from the saved comparison result.
-
-### Backward workflow
-
-1. Run one forward pass on a prompt.
-2. Define a target token and NLL loss.
-3. Run one backward pass.
-4. Save target-conditioned backward artifacts for later interpretation.
-
-### Patchscope workflow
-
-1. Capture a forward artifact once and treat it as the source representation store.
-2. Select a source layer/position from the saved artifact.
-3. Patch that representation into a target prompt run at a chosen layer/position.
-4. Save a patchscope artifact for later decoding, comparison, or sweep aggregation.
-
-Generation-focused patchscope and patch-sweep analyses are also part of the broader `LogitDiff Lens` workflow family, using the same wrapper and activation concepts for continuation-time interventions.
-
-### Dataset and batching workflow
-
-1. Run prompt capture or comparison over prompt sets rather than only one prompt.
-2. Respect attention masks and ignore meaningless padded positions in downstream analysis.
-3. Handle special tokens explicitly so token-level plots and summaries stay interpretable.
-4. Aggregate results across batches or datasets when you want broader conclusions than a single prompt can provide.
-
-### Plotly workflow
-
-1. Save a comparison result.
-2. Choose a metric such as JSD or top-k Jaccard overlap.
-3. Export `.html` when you want an interactive Plotly figure.
-4. Export `.pdf` when you want a static figure for a report or paper.
-
-For generation-lens runs, the public plotting surface is available through `logit_diff_lens.plotting`, including the generation heatmap helpers.
-
-## Documentation map
+## Docs
 
 - [docs/README.md](docs/README.md)
-  Public documentation hub for readers and users.
-- [docs/README_forward_capture_artifacts.md](docs/README_forward_capture_artifacts.md)
-  Save prompt captures for later analysis.
-- [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
-  Compare two saved runs and create divergence plots.
 - [docs/README_wrappers.md](docs/README_wrappers.md)
-  Supplemental wrapper guide for the same core wrapper layer described above.
-- [docs/README_generation_lens.md](docs/README_generation_lens.md)
-  Run generation-lens analyses over actual continuations, templates, and alternate prompting conditions.
+- [docs/README_forward_capture_artifacts.md](docs/README_forward_capture_artifacts.md)
+- [docs/README_lens_workflows.md](docs/README_lens_workflows.md)
 - [docs/README_heatmaps.md](docs/README_heatmaps.md)
-  Canonical plotting guide for prompt-lens, generation-lens, and the other existing heatmap families.
+- [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)
-  Run patchscope interventions from saved captures.
 - [docs/README_logit_prisms.md](docs/README_logit_prisms.md)
-  Localize differences across embedding, attention, MLP, and full-stream views.
 - [docs/README_backward_artifacts.md](docs/README_backward_artifacts.md)
-  Capture backward signals for a chosen target token.
 - [docs/README_model_weight_vocab_methods.md](docs/README_model_weight_vocab_methods.md)
-  Explore weight-space and vocabulary-space interpretation methods.
-
-## Status
-
-This repository is under active research development, with a focus on reusable prompt analysis, comparison workflows, intervention methods, and interpretable visualizations.

@@ -4,66 +4,146 @@
 
 ## Overview
 
-Comparison artifacts are the main way `LogitDiff` turns two saved runs into a user-facing analysis result. They make it easy to compare systems, readouts, or settings and then visualize where they diverge in prompt-lens or prompt-side analysis, while the same comparison ideas also extend to generation-lens studies.
+`LogitDiff` has two comparison-style reuse paths:
 
-## Wrappers and normalization
+- prompt-side canonical comparison artifacts from saved prompt captures
+- generation-side comparison payloads that serve the same reuse role for generation analyses
 
-Wrappers matter during comparison because they keep both sides of the comparison aligned in how tokens, masking, padding, and decoding are handled.
+The prompt-side comparison artifact is its own saved format. The generation-side comparison path currently reuses the generation-style payload rather than the prompt comparison-artifact file format.
 
-For readouts, the main user-facing choices are:
+## Prompt-side use
 
-- `raw`
-- `ModelNorm`
-- `Tuned Lens`
+Use the prompt-side comparison artifact when you want to:
 
-If two comparisons use different readout modes, that difference should be treated as part of the comparison itself.
+- compare two prompt captures on the same text
+- compare base vs. finetuned prompt behavior
+- compare two prompt-side conditions under the same tokenization surface
+- export a comparison-metric heatmap from saved artifacts
 
-## When to use it
+## Prompt-side inputs
 
-Use a comparison artifact when you want to:
+- one saved prompt artifact for the `ft` side
+- one saved prompt artifact for the `base` side
+- one readout mode such as `raw` or `model_norm`
+- one output path
 
-- compare two models on the same prompt
-- compare two runs over batches or datasets
-- compare the same model under different prompting or decoding conditions
-- compare two readout settings such as `ModelNorm` and `Tuned Lens`
-- create a heatmap from saved prompt captures
-- find positions or layers with large divergence
+Those prompt artifacts can come from either:
 
-## What you give it
+- a single-prompt capture
+- a dataset-style capture using the same wrapper-controlled tokenization and masking surface
 
-- one saved run for system A
-- one saved run for system B
-- a readout mode
-- an output path
+For stable prompt-side comparisons, the two source artifacts should be captured with matching settings for:
 
-## What it gives back
+- `prompt_format`
+- `use_chat_template`
+- `system_prompt`
+- `truncate`
+- `max_length`
+- `padding`
+- `force_include_input`
+- `force_include_output`
+- `norm_modes`
 
-It saves the comparison result and can also export a figure such as a PDF or interactive Plotly heatmap.
-
-## Example command
+## Prompt-side command
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
-  --ft-artifact tmp/artifacts/<run-a>.pt \
-  --base-artifact tmp/artifacts/<run-b>.pt \
-  --comparison-output tmp/artifacts/<comparison-name>.pt \
+  --ft-artifact tmp/artifacts/<ft-run>.pt \
+  --base-artifact tmp/artifacts/<base-run>.pt \
+  --comparison-output tmp/artifacts/<comparison-run>.pt \
   --readout-mode model_norm \
   --metric topk_jaccard_ft_base \
-  --plot-output tmp/artifacts/<comparison-name>.html
+  --plot-output tmp/artifacts/<comparison-run>.html \
+  --title "Prompt Comparison"
 ```
 
-## Generation-lens follow-up example
+Optional direct plot export:
+
+```bash
+PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
+  --ft-artifact tmp/artifacts/<ft-run>.pt \
+  --base-artifact tmp/artifacts/<base-run>.pt \
+  --comparison-output tmp/artifacts/<comparison-run>.pt \
+  --readout-mode model_norm \
+  --metric jsd_ft_base \
+  --plot-output tmp/artifacts/<comparison-run>.pdf
+```
+
+## Prompt-side output
+
+The prompt-side comparison artifact stores prompt-side divergence metrics such as token-overlap and probability-distribution comparisons. It is then reused by:
+
+- comparison-metric heatmaps
+- prompt-side follow-up selection
+- prism-style comparison workflows
+
+With `--readout-mode model_norm`, the comparison uses the final-layer-norm readout from the captured output-side L+1 projection.
+
+## Generation-side analogue
+
+Generation-side comparison can be driven either by a saved generation payload or by the live compute path in the public generation heatmap wrapper. The plotting controls stay on the same wrapper surface in both cases, while the live path additionally takes the generation inputs that produce the payload.
+
+Saved generation-side path:
+
+```bash
+PYTHONPATH=src python pipelines/em_qwen/run_gen_lens.py \
+  --config configs/em_qwen/gen_lens/chat_template/risky_14.json
+```
+
+and then:
 
 ```bash
 PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
-  --input-path tmp/<generation-run>/<layerwise-json>.json \
-  --output-path tmp/<generation-run>/figures/<generation-heatmap>.html \
-  --format html \
-  --prompt-index 0
+  --input-path tmp/<run-root>/data/<layerwise-json>.json \
+  --output-path tmp/<run-root>/figures/<generation-heatmap>.pdf \
+  --plot-kind jaccard \
+  --prompt-index 0 \
+  --top-k 10 \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode ft_generated \
+  --x-tick-mode-secondary base_generated \
+  --title "Generation Comparison" \
+  --colorscale RdBu \
+  --show-marginals
 ```
 
-## How to interpret the result
+Live generation-side path:
 
-The saved comparison tells you where two systems come apart across tokens and layers. In batched or dataset-style analysis, the important point is to read only meaningful token positions and avoid treating masked or padded positions as real evidence. Jaccard-style heatmaps are especially useful when you care about overlap in top predictions rather than only probability divergence.
+```bash
+PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
+  --model-name <base-model-name> \
+  --comparison-model-name <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/<run-root>/figures/<generation-heatmap>.pdf \
+  --plot-kind jaccard \
+  --top-k 10 \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --force-include-input \
+  --force-include-output \
+  --display-top-tokens 10 \
+  --visible-cell-tokens 10 \
+  --start-position 0 \
+  --end-position 64 \
+  --max-layers 6 \
+  --layer-selection all \
+  --x-tick-mode ft_generated \
+  --x-tick-mode-secondary base_generated \
+  --title "Generation Comparison" \
+  --colorscale RdBu \
+  --show-marginals \
+  --max-new-tokens 32 \
+  --batch-size 8 \
+  --norm-modes raw unit_norm eps_norm model_norm
+```
 
-For explicit prompt-heatmap and generation-heatmap plotting paths, see [README_heatmaps.md](/media/am/AM/logit-diff-lens/docs/README_heatmaps.md).
+So the comparison story should be read as one LogitDiff concept with reusable payloads and live-compute entrypoints:
+
+- prompt-side comparison artifact
+- generation-side comparison payload

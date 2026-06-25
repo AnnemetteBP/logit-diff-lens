@@ -4,75 +4,218 @@
 
 ## Overview
 
-The wrapper layer is what lets `LogitDiff Lens` run prompt lens, generation lens, custom generation workflows, and patching workflows through one toolkit surface across different model families. This is part of `LogitDiff` itself, not a separate legacy path.
-
-## When to use it
-
-Use the wrappers when you want to:
-
-- keep prompt and generation analysis under the same interface
-- compare `raw`, `ModelNorm`, and `Tuned Lens` readouts
-- handle padding, masks, and special tokens consistently
-- reuse captured hidden states across multiple downstream analyses
-- run prompt, batch, dataset, and generation-style workflows without changing the whole analysis setup
+`LogitDiff` is organized around wrapper types. Prompt lens, generation lens, patching, and downstream decoding are wrapper-backed modes inside the same toolkit. The wrapper surface is what keeps tokenization, masks, normalization, LM-head projection, and saved activations aligned across analyses.
 
 ## Main wrappers
 
-- `LogitLensWrapper` for prompt-side forward capture and prompt-lens analysis
-- `GenerateLensWrapper` for standard generation-lens runs over continuations
-- `CustomGenerationLensWrapper` for custom generation behavior and generation-time analysis variants
-- `PatchingLensWrapper` for prompt-side and generation-focused intervention workflows
+- `LogitLensWrapper`
+  Prompt-side forward capture and prompt-lens decoding.
+- `GenerateLensWrapper`
+  Standard generation-lens runs built around generation-time hidden-state capture.
+- `CustomGenerationLensWrapper`
+  Generation-time analysis when the custom generation loop is the right fit.
+- `PatchingLensWrapper`
+  Prompt and generation intervention workflows.
 
-## Readout choices
+## Wrapper-backed modes
 
-The main readout choices are:
+The main wrapper-backed collection and analysis modes are:
 
-- `raw`, which decodes the hidden state directly
-- `ModelNorm`, which applies the model's own final normalization before the LM head
-- `Tuned Lens`, which applies a learned readout before decoding
+- prompt lens
+  Uses `LogitLensWrapper` for fixed-prompt capture, prompt-side decoding, prompt comparisons, and prompt heatmaps.
+- generation lens
+  Uses `GenerateLensWrapper` or `CustomGenerationLensWrapper` for continuation-time capture, generation comparisons, and generation heatmaps.
+- patching and patchscopes
+  Uses `PatchingLensWrapper` plus saved prompt or generation artifacts for prompt patchscope, generation patchscope, and patch sweeps.
 
-These are method choices, not minor implementation details. If two readouts behave differently, that difference is part of the result.
+Those workflow surfaces now include both:
+
+- saved-artifact reuse
+- live compute-and-plot or live compute-and-analyze entrypoints where the repo already supports them
+
+## Readout modes
+
+The current prompt capture path preserves what is needed for:
+
+- `raw`
+- `model_norm`
+
+Older and auxiliary analyses in the repo also compare against `Tuned Lens`, but that is a separate learned readout rather than a native wrapper decode mode.
 
 ## Prompt formatting and token handling
 
-The same wrapper layer is also where `LogitDiff` keeps prompt formatting and token handling consistent.
+The wrapper layer is where `LogitDiff` keeps prompt formatting and token handling consistent:
 
-This includes:
-
-- plain prompts with no template
-- chat-template formatting
-- prefix-style formatting such as `user_assistant_prefix`
-- optional `system_prompt` injection when the method uses it
-- attention-mask-aware processing
-- padding-aware downstream analysis
+- plain prompts
+- chat-template prompts
+- `user_assistant_prefix` prompts
+- optional `system_prompt`
 - special-token-aware tokenization and decoding
-- dataset-style tokenization paths
-- generation-time token growth under the same wrapper interface
+- attention-mask-aware trimming
+- padding-aware downstream analysis
 
-## Data, batching, and masks
+That same logic is used across prompt capture, generation, patchscopes, backward artifacts, and component analyses.
 
-The wrapper layer is also what keeps runs aligned when you move from one prompt to many prompts.
+## Shared wrapper-controlled behavior
 
-This includes:
+These behaviors belong to the wrapper layer and should be understood once for both prompt and generation workflows:
+
+- tokenization
+- prompt formatting
+- `plain`, `chat_template`, and `user_assistant_prefix` modes
+- optional `system_prompt`
+- special-token handling
+- attention-mask trimming
+- padding-aware downstream analysis
+- `force_include_input`
+- `force_include_output`
+- `norm_modes`
+- artifact reuse across downstream analyses
+
+## Prompt-side capture surface
+
+The public prompt capture entrypoint is:
+
+```bash
+PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<run-name>.pt \
+  --dtype bfloat16 \
+  --use-chat-template \
+  --prompt-format chat_template \
+  --system-prompt "<system-prompt>" \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw model_norm \
+  --collect-components
+```
+
+Prompt capture also supports dataset-style runs:
+
+```bash
+PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
+  --model-name <model-name> \
+  --dataset-path <dataset.jsonl> \
+  --text-field text \
+  --output-path tmp/artifacts/<dataset-run>.pt \
+  --dtype bfloat16 \
+  --prompt-format plain \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --force-include-input \
+  --norm-modes raw model_norm
+```
+
+Important prompt-side controls already exposed in code:
+
+- `--tokenizer-name`
+- `--adapter-path`
+- `--dtype`
+- `--device-map`
+- `--load-in-4bit`
+- `--load-in-8bit`
+- `--use-chat-template`
+- `--prompt-format`
+- `--system-prompt`
+- `--no-add-special-tokens`
+- `--force-include-input`
+- `--force-include-output`
+- `--collect-components`
+- `--project-component-logits`
+- `--save-logits`
+
+## Generation-side surface
+
+The generation side has both direct capture entrypoints and config-driven pipeline entrypoints.
+
+Direct capture:
+
+```bash
+PYTHONPATH=src python pipelines/capture_generation_artifacts.py \
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<generation-run>.pt \
+  --dtype bfloat16 \
+  --prompt-format plain \
+  --truncate \
+  --max-length 512 \
+  --padding longest \
+  --max-new-tokens 32 \
+  --batch-size 8 \
+  --force-include-input \
+  --force-include-output \
+  --norm-modes raw unit_norm eps_norm model_norm
+```
+
+Config-driven runs already in the repo:
+
+```bash
+PYTHONPATH=src python pipelines/em_qwen/run_gen_lens.py \
+  --config configs/em_qwen/gen_lens/chat_template/risky_14.json
+```
+
+```bash
+PYTHONPATH=src python pipelines/quant_llama/run_gen_lens.py \
+  --config configs/quant_llama/gen_lens/hf1bit_14.json
+```
+
+The config is where generation-side controls live:
+
+- `prompt_source`
+- `prompt_key`
+- `max_new_tokens`
+- `top_k`
+- `comparison_top_ks`
+- `layers`
+- `norm_mode`
+- `do_sample`
+- `temperature`
+- `template_name`
+- `prompt_format`
+- `use_chat_template`
+- `system_prompt`
+
+The generation collectors in the repo also support:
+
+- dataset-driven runs
+- `batch_size`
+- `max_new_tokens`
+- `truncate`
+- `max_length`
+- padding control
+- special-token inclusion or exclusion
+- prompt formatting and system prompts
+- optional component capture
+
+The public prompt and generation heatmap CLIs now mirror that same split:
+
+- `--input-path` for saved-payload plotting
+- model/prompt/dataset/capture controls for live compute-and-plot
+
+## Batches, datasets, and masks
+
+The wrapper and collector stack is meant to work for more than one prompt:
 
 - single prompts
-- batches
-- dataset-style analysis
-- prompt-side masking
-- padding-aware filtering of meaningless token positions
-- generation-time continuation handling under the same tokenizer and model surface
+- prompt datasets
+- model-response datasets
+- generation datasets
+- batched generation collection
 
-## Example import
+Prompt-side code trims to the effective attention-mask span so padding-only token positions do not leak into downstream plots. Generation-side collectors also carry the attention mask and special-token controls needed to keep prompt and generated token regions interpretable.
 
-```python
-from logit_diff_lens.wrappers import (
-    CustomGenerationLensWrapper,
-    GenerateLensWrapper,
-    LogitLensWrapper,
-    PatchingLensWrapper,
-)
-```
+Public wrapper-facing capture parameters now exposed in the main toolkit include:
+
+- prompt-side:
+  `--prompt`, `--dataset-path`, `--text-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`
+- generation-side:
+  `--prompt`, `--dataset-path`, `--text-field`, `--label-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--no-add-special-tokens`, `--analyze-special-tokens`, `--max-new-tokens`, `--batch-size`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`, `--custom-generate`
 
 ## How to interpret the result
 
-The wrappers are not the analysis result by themselves. Their role is to keep model loading, token handling, normalization, and hidden-state exposure stable so that heatmaps, patchscopes, prisms, and lens comparisons are based on a consistent interface.
+The wrappers are not the result by themselves. Their job is to make sure prompt lens and generation lens stay two modes of the same LogitDiff toolkit rather than drifting into separate tokenization, masking, or decode surfaces.

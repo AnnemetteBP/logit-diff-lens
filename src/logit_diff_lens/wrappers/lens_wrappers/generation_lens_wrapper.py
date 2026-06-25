@@ -106,6 +106,10 @@ class GenerateLensWrapper(BaseLensWrapper):
         texts: str | list[str],
         device: str | None = None,
         add_special_tokens: bool = True,
+        padding: bool | str | None = None,
+        truncation: bool = False,
+        max_length: int | None = None,
+        **tokenizer_kwargs,
     ) -> Dict[str, torch.Tensor]:
         try:
             emb_device = self.model.get_input_embeddings().weight.device
@@ -117,8 +121,11 @@ class GenerateLensWrapper(BaseLensWrapper):
         inputs = self.tokenizer(
             texts,
             return_tensors="pt",
-            padding=isinstance(texts, list),
+            padding=isinstance(texts, list) if padding is None else padding,
+            truncation=truncation,
+            max_length=max_length,
             add_special_tokens=add_special_tokens,
+            **tokenizer_kwargs,
         )
 
         return {

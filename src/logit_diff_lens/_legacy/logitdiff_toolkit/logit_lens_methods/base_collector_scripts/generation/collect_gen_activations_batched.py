@@ -23,6 +23,9 @@ class GenerationActivationCollectorConfig:
     system_prompt: str | None = None
     add_special_tokens: bool = False
     analyze_special_tokens: bool = False
+    truncation: bool = False
+    max_length: int | None = None
+    padding: bool | str | None = None
     force_include_input: bool = True
     force_include_output: bool = True
     norm_modes: tuple[str, ...] = ("raw", "unit_norm", "eps_norm", "model_norm")
@@ -80,6 +83,9 @@ def collect_generation_activations(
         batch_index=0,
         add_special_tokens=config.add_special_tokens,
         analyze_special_tokens=config.analyze_special_tokens,
+        truncation=config.truncation,
+        max_length=config.max_length,
+        padding=config.padding,
         force_include_input=config.force_include_input,
         force_include_output=config.force_include_output,
         save_path=None,
@@ -97,6 +103,9 @@ def collect_generation_activations(
         "collect_components": bool(config.collect_components),
         "project_component_logits": bool(config.project_component_logits),
         "max_new_tokens": int(config.max_new_tokens),
+        "truncation": bool(config.truncation),
+        "max_length": config.max_length,
+        "padding": config.padding,
     }
 
 
@@ -108,6 +117,9 @@ def _collect_generation_for_analysis(
     batch_index:int=0,
     add_special_tokens:bool=False,
     analyze_special_tokens:bool=False,
+    truncation: bool = False,
+    max_length: int | None = None,
+    padding: bool | str | None = None,
     device:str|None=None,
     force_include_input:bool=True,
     force_include_output:bool=True,
@@ -169,6 +181,9 @@ def _collect_generation_for_analysis(
             texts=text,
             device=device,
             add_special_tokens=add_special_tokens,
+            truncation=truncation,
+            max_length=max_length,
+            padding=padding,
         )
 
         input_ids = inputs["input_ids"]
@@ -415,6 +430,9 @@ def collect_generation_for_analysis(
     output_path:str|Path|None=None,
     add_special_tokens:bool=False,
     analyze_special_tokens:bool=False,
+    truncation: bool = False,
+    max_length: int | None = None,
+    padding: bool | str | None = None,
     force_include_input:bool=True,
     force_include_output:bool=True,
     device:str|None=None,
@@ -444,6 +462,9 @@ def collect_generation_for_analysis(
                 batch_index=batch_idx,
                 add_special_tokens=add_special_tokens,
                 analyze_special_tokens=analyze_special_tokens,
+                truncation=truncation,
+                max_length=max_length,
+                padding=padding,
                 device=device,
                 force_include_input=force_include_input,
                 force_include_output=force_include_output,
@@ -469,6 +490,9 @@ def collect_generation_for_analysis(
         "dataset": dataset,
         "batch_size": batch_size,
         "max_new_tokens": max_new_tokens,
+        "truncation": truncation,
+        "max_length": max_length,
+        "padding": padding,
         "force_include_input": force_include_input,
         "force_include_output": force_include_output,
         "norm_modes": list(norm_modes),
@@ -495,6 +519,9 @@ def collect_activation_dataset_incremental(
     system_prompt: str | None = None,
     add_special_tokens: bool = False,
     analyze_special_tokens: bool = False,
+    truncation: bool = False,
+    max_length: int | None = None,
+    padding: bool | str | None = None,
     force_include_input: bool = True,
     force_include_output: bool = True,
     norm_modes: tuple[str, ...] = ("raw", "unit_norm", "eps_norm", "model_norm"),
@@ -547,6 +574,9 @@ def collect_activation_dataset_incremental(
             batch_index=batch_idx,
             add_special_tokens=add_special_tokens,
             analyze_special_tokens=analyze_special_tokens,
+            truncation=truncation,
+            max_length=max_length,
+            padding=padding,
             force_include_input=force_include_input,
             force_include_output=force_include_output,
             save_path=None,
@@ -583,6 +613,9 @@ def collect_activation_dataset_incremental(
         "system_prompt": system_prompt,
         "add_special_tokens": add_special_tokens,
         "analyze_special_tokens": analyze_special_tokens,
+        "truncation": truncation,
+        "max_length": max_length,
+        "padding": padding,
         "force_include_input": force_include_input,
         "force_include_output": force_include_output,
         "norm_modes": list(norm_modes),

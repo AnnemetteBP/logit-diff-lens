@@ -101,9 +101,21 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--system-prompt", default=None)
     parser.add_argument("--no-add-special-tokens", action="store_true")
+    parser.add_argument("--truncate", action="store_true")
+    parser.add_argument("--max-length", type=int, default=None)
+    parser.add_argument(
+        "--padding",
+        choices=("auto", "longest", "max_length", "do_not_pad"),
+        default="auto",
+    )
     parser.add_argument("--force-include-input", action="store_true", default=True)
     parser.add_argument("--no-force-include-input", dest="force_include_input", action="store_false")
     parser.add_argument("--force-include-output", action="store_true")
+    parser.add_argument(
+        "--norm-modes",
+        nargs="+",
+        default=("raw", "model_norm"),
+    )
     parser.add_argument("--collect-components", action="store_true")
     parser.add_argument("--project-component-logits", action="store_true")
     parser.add_argument("--save-logits", action="store_true", default=True)
@@ -115,15 +127,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def _build_collector_config_from_args(args: argparse.Namespace, prompt: str) -> PromptLensActivationCollectorConfig:
+    padding = None
+    if args.padding == "longest":
+        padding = "longest"
+    elif args.padding == "max_length":
+        padding = "max_length"
+    elif args.padding == "do_not_pad":
+        padding = False
     return PromptLensActivationCollectorConfig(
         prompt=prompt,
         use_chat_template=bool(args.use_chat_template),
         prompt_format=args.prompt_format,
         system_prompt=args.system_prompt,
         add_special_tokens=not bool(args.no_add_special_tokens),
+        truncation=bool(args.truncate),
+        max_length=args.max_length,
+        padding=padding,
         force_include_input=bool(args.force_include_input),
         force_include_output=bool(args.force_include_output),
-        norm_modes=("raw", "model_norm"),
+        norm_modes=tuple(args.norm_modes),
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         save_logits=bool(args.save_logits),

@@ -15,6 +15,7 @@ Use backward artifacts when you want to:
 - analyze which layers matter for a chosen target token
 - explore attribution-style analysis inside `LogitDiff`
 - connect prompt-side or generation-side behavior to backward signals
+- follow up on either single-model behavior or a comparison result chosen from earlier prompt or generation analysis
 
 ## What you give it
 
@@ -22,6 +23,22 @@ Use backward artifacts when you want to:
 - a prompt
 - a target token
 - an output path
+
+The backward capture command also supports the same prompt-formatting controls used elsewhere in the toolkit:
+
+- `--use-chat-template`
+- `--prompt-format`
+- `--system-prompt`
+- `--tokenizer-name`
+- `--adapter-path`
+- `--dtype`
+- `--device-map`
+- `--load-in-4bit`
+- `--load-in-8bit`
+- `--no-add-special-tokens`
+- `--truncate`
+- `--max-length`
+- `--padding`
 
 ## What it gives back
 
@@ -35,9 +52,14 @@ PYTHONPATH=src python pipelines/capture_backward_artifact.py \
   --prompt "<prompt-text>" \
   --target-token-text "<target-token>" \
   --output-path tmp/artifacts/<backward-run>.pt \
-  --dtype <dtype>
+  --dtype bfloat16 \
+  --use-chat-template \
+  --prompt-format chat_template \
+  --system-prompt "<system-prompt>"
 ```
 
 ## How to interpret the result
 
 Read the saved output as a target-conditioned view of the prompt. It tells you how the chosen token depends on internal states, which can complement what you already saw from forward captures, comparisons, or prism-style views.
+
+The same idea can be used as follow-up analysis for generation-side behavior as well: pick a target token or generation outcome from an earlier generation run, then capture the backward signal with the same prompt formatting and tokenization surface so the forward and backward views remain aligned.

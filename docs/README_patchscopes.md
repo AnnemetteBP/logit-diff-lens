@@ -13,6 +13,7 @@ Use patchscopes when you want to:
 - test whether one token representation drives a change downstream
 - follow up on a strong difference from a heatmap
 - compare how two systems react to the same inserted representation
+- compare one model under two generation conditions
 - explore causal intervention rather than just observation
 - follow up on batched or dataset-level findings with targeted single examples
 - run generation-oriented intervention analysis, not only prompt-only patching
@@ -32,6 +33,11 @@ For the command placeholders in this guide:
 - `<source-layer>` and `<target-layer>` are integer layer indices
 - `<source-position>` and `<target-position>` are integer token positions
 
+The source side can come from either:
+
+- a prompt-side saved artifact
+- a generation-side saved artifact or generation run output
+
 ## What it gives back
 
 It saves a patched run showing how the target prompt or target continuation behaves after the chosen representation is inserted.
@@ -44,6 +50,11 @@ They are useful in both:
 
 - prompt-lens analysis, where you patch within or across fixed prompt runs
 - generation-lens analysis, where you patch into continuations and study how later generated behavior changes
+
+That includes both:
+
+- single-model intervention studies
+- pairwise studies across two models, two lenses, or two generation conditions
 
 This includes the kind of generation-focused patchscope analysis used in paper-style case studies, where a chosen high-difference token or layer is patched across positions to see how the continuation changes.
 
@@ -86,6 +97,24 @@ PYTHONPATH=src python pipelines/run_patchscope_generation_sweep.py \
   --prompt "<prompt-text>" \
   --output-path tmp/artifacts/<generation-patch-sweep>.json
 ```
+
+## Shared interpretation
+
+Prompt patchscope and generation patchscope are the same broader LogitDiff intervention family:
+
+- prompt patchscope asks what changes in a fixed prompt run
+- generation patchscope asks what changes in the continuation trajectory
+
+Both are meant to follow up on saved prompt or generation analyses rather than standing apart from the lens workflows.
+
+That means the useful upstream controls are the same wrapper-controlled settings used elsewhere in the toolkit:
+
+- `prompt` or `dataset` source
+- prompt formatting and optional system prompt
+- truncation, max length, and padding
+- `force_include_input`
+- `force_include_output`
+- chosen readout or norm mode
 
 ## How to interpret the result
 

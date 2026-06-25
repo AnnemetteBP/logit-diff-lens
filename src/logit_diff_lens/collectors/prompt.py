@@ -73,6 +73,9 @@ class PromptLensActivationCollectorConfig:
     prompt_format: Literal["plain", "chat_template", "user_assistant_prefix"] = "plain"
     system_prompt: str | None = None
     add_special_tokens: bool = True
+    truncation: bool = False
+    max_length: int | None = None
+    padding: bool | str | None = None
     force_include_input: bool = True
     force_include_output: bool = False
     norm_modes: tuple[str, ...] = ("raw", "model_norm")
@@ -147,6 +150,9 @@ def _build_prompt_decode_artifact(
         lens_modes=[mode for mode in config.norm_modes if mode in ("raw", "model_norm")],
         metadata={
             "add_special_tokens": bool(config.add_special_tokens),
+            "truncation": bool(config.truncation),
+            "max_length": config.max_length,
+            "padding": config.padding,
             "force_include_input": bool(config.force_include_input),
             "force_include_output": bool(config.force_include_output),
             "collect_components": bool(config.collect_components),
@@ -345,6 +351,9 @@ def collect_prompt_lens_activations(
         texts=prompt_formatted,
         device=wrapper.model_device,
         add_special_tokens=config.add_special_tokens and not config.use_chat_template,
+        truncation=config.truncation,
+        max_length=config.max_length,
+        padding=config.padding,
     )
     input_ids = inputs["input_ids"]
     attention_mask = inputs["attention_mask"]
@@ -480,11 +489,14 @@ def collect_prompt_activation_dataset_incremental(
     prompt_format: str,
     system_prompt: str | None,
     add_special_tokens: bool,
-    force_include_input: bool,
-    force_include_output: bool,
-    norm_modes: tuple[str, ...],
-    collect_components: bool,
-    project_component_logits: bool,
+    truncation: bool = False,
+    max_length: int | None = None,
+    padding: bool | str | None = None,
+    force_include_input: bool = True,
+    force_include_output: bool = False,
+    norm_modes: tuple[str, ...] = ("raw", "model_norm"),
+    collect_components: bool = False,
+    project_component_logits: bool = False,
     save_logits: bool = True,
 ) -> Dict[str, Any]:
     dataset_path = Path(dataset_path)
@@ -499,6 +511,9 @@ def collect_prompt_activation_dataset_incremental(
             prompt_format=prompt_format,
             system_prompt=system_prompt,
             add_special_tokens=add_special_tokens,
+            truncation=truncation,
+            max_length=max_length,
+            padding=padding,
             force_include_input=force_include_input,
             force_include_output=force_include_output,
             norm_modes=norm_modes,
