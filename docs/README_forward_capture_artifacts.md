@@ -4,13 +4,25 @@
 
 ## Overview
 
-Forward capture is the starting point for most `LogitDiff` workflows. It saves the prompt-level activations that later analyses reuse for heatmaps, lens comparisons, patchscopes, and other views.
+Forward capture is the starting point for most `LogitDiff` workflows. It saves the activations from a prompt, batch, or dataset-style run so they can be used for heatmaps, lens comparisons, patchscopes, and other views.
+
+## Wrappers and normalization
+
+The wrapper layer is important here because it keeps tokenization, masking, special-token handling, device movement, and readout behavior consistent across models.
+
+The most common readout choices are:
+
+- `raw`, which decodes directly from the hidden state
+- `ModelNorm`, which applies the model's final normalization before decoding
+- `Tuned Lens`, which uses a learned readout
 
 ## When to use it
 
 Use forward capture when you want to:
 
 - inspect how a model evolves across layers for one prompt
+- run the same analysis across many prompts
+- prepare batched or dataset-style captures
 - save activations once and analyze them later
 - compare different lenses on the same prompt
 - prepare inputs for comparison or patchscope analysis
@@ -19,17 +31,18 @@ Use forward capture when you want to:
 
 - a model name
 - a prompt
+- or a prompt set / dataset slice
 - an output path
 - optional dtype and capture settings
 
 ## What it gives back
 
-It saves a prompt artifact containing the token sequence and the layer-by-layer activations needed for later analysis.
+It saves the token sequence and the layer-by-layer activations needed for later analysis, while allowing later steps to ignore meaningless padded positions and respect the original masking.
 
 ## Example command
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_prompt_artifacts.py \
+PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --prompt "If I had more time, I would travel more often." \
   --output-path tmp/artifacts/pythia70m_prompt_capture.pt \
@@ -39,4 +52,4 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_pro
 
 ## How to interpret the result
 
-Think of the saved artifact as the base record for one prompt. You normally do not read it directly; instead, you reuse it for plots and follow-up analyses so every later result is grounded in the same captured run.
+Think of the saved result as the base record for a run. You normally do not read it directly; instead, you reuse it for plots and follow-up analyses while keeping token positions, masking, padding behavior, and readout choices aligned with the original input.

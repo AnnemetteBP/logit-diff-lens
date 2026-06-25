@@ -60,7 +60,7 @@ unless those appear inside running explanatory prose where lowercase is grammati
 
 ## Generic comparison notation
 
-Do **not** hardcode the framework to only compare a base model against a finetuned model.
+Do **not** hardcode the toolkit to only compare a base model against a finetuned model.
 
 The figures must use generic notation that allows `LogitDiff` to compare any two systems, settings, or readouts.
 
@@ -90,7 +90,7 @@ as small annotations or examples, not as the primary notation of the figure.
 
 Very important:
 
-`LogitDiff` is not primarily a “winner/loser” or “better/worse” framework.
+`LogitDiff` is not primarily a “winner/loser” or “better/worse” toolkit.
 
 Its main purpose is to study:
 
@@ -120,18 +120,21 @@ not:
 
 # What the repository is
 
-`LogitDiff` is a reusable research framework for:
+`LogitDiff` is a reusable research toolkit for:
 
 - logit-lens-style analysis
 - differential comparisons between two systems or conditions
-- forward hidden-state capture
-- reusable artifact-driven analysis
+- prompt and generation logit-lens analysis
+- single-prompt, batched, and dataset-level analysis
+- attention-mask-aware and padding-aware processing
+- special-token-aware handling
+- forward hidden-state capture when useful
 - subblock decomposition
 - vocabulary-space projection
 - backward-pass target-conditioned capture
 - future low-rank, quantization, and MoE analysis
 
-The framework is designed so that many downstream analyses can reuse the same saved hidden-state capture whenever possible.
+Reusable saved captures are useful, but they should be presented as one workflow option rather than the main attraction of the toolkit.
 
 ---
 
@@ -139,15 +142,15 @@ The framework is designed so that many downstream analyses can reuse the same sa
 
 Create a coherent figure family with a shared visual language.
 
-The most important figure is the main framework overview. The rest are method-specific subfigures or companion figures.
+The most important figure is the main toolkit overview. The rest are method-specific subfigures or companion figures.
 
-## Figure 1: Main framework overview
+## Figure 1: Main toolkit overview
 
 This should be the primary root README figure.
 
 ### Purpose
 
-Show the overall `LogitDiff` workflow from capture to reusable artifacts to multiple downstream analysis families.
+Show the overall `LogitDiff` workflow across prompt analysis, generation analysis, batching or datasets, and downstream analysis views.
 
 ### Content
 
@@ -155,7 +158,7 @@ Represent the flow as something like:
 
 1. Input / system pair / condition pair
 2. Wrapper / backend / model execution
-3. Forward capture artifact
+3. Prompt or generation run
 4. Optional backward artifact
 5. Comparison artifact
 6. Downstream analysis branches
@@ -169,6 +172,7 @@ The downstream branches should include:
 - SVD / low-rank analysis
 - backward target-conditioned analysis
 - generation comparison
+- batch / dataset aggregation
 
 ### Conceptual structure
 
@@ -181,27 +185,21 @@ System A / System B
         ↓
    Wrapper + Backend
         ↓
-Forward Capture Artifact
+Prompt Lens / Generation Lens
+   ↙        ↓         ↘
+Single Prompt  Batch/Dataset  Generation
         ↓
-Comparison Artifact
-   ↙    ↓      ↘
-Heatmaps  Prisms  SVD / Vocab
-
-Prompt + Target
-      ↓
-Backward Artifact
-      ↓
-Backward Analysis
+Comparison / Intervention / Interpretation
 ```
 
 ### Important message
 
 The figure should communicate:
 
-- capture once
-- reuse many times
 - compare generically
-- derive many analysis views from shared artifacts
+- support prompt and generation workflows
+- support single examples, batches, and datasets
+- handle real tokenization details such as masking, padding, and special tokens
 
 ---
 
@@ -209,7 +207,7 @@ The figure should communicate:
 
 ### Purpose
 
-Explain what the canonical forward artifact contains.
+Explain what a saved forward run contains when the user chooses to persist it.
 
 ### Content
 
@@ -221,16 +219,19 @@ Show:
 - optional MLP output
 - metadata
 - optional cached readouts
+- attention masks
+- special-token handling
+- meaningful-token filtering for padded positions
 
 ### Important message
 
-This is the shared source of truth for many downstream analyses.
+This is one useful storage path for later analysis, not the whole point of the toolkit.
 
 The figure should emphasize that:
 
-- hidden states are saved once
-- multiple readouts can be derived later
-- this supports reproducibility and extensibility
+- saved runs can support later analysis
+- masking and padding should be handled correctly
+- the same toolkit also supports direct prompt, batch, dataset, and generation analysis
 
 ---
 
@@ -242,14 +243,14 @@ Show the generic comparison path.
 
 ### Content
 
-Show two forward artifacts entering a canonical comparison step:
+Show two saved runs entering a comparison step:
 
 ```text
 Artifact A + Artifact B
         ↓
-Canonical comparison
+Comparison
         ↓
-ft-minus-base style generic ordering replaced by:
+one possible ordering is:
 comparison-minus-reference
         ↓
 metrics + heatmap-ready payload
@@ -337,7 +338,7 @@ The patchscope path should look like a natural extension of the artifact-first d
 - intervene on a target run
 - save reusable intervention artifacts
 
-This figure should not look like a one-off debugging script. It should look like a proper analysis family inside the framework.
+This figure should not look like a one-off debugging script. It should look like a proper analysis family inside the toolkit.
 
 ---
 
@@ -390,7 +391,7 @@ Split into two sides:
 
 ### Important message
 
-This framework supports both:
+This toolkit supports both:
 
 - model-weight-level interpretability
 - prompt-conditioned activation analysis
@@ -549,6 +550,6 @@ Do not frame `LogitDiff` as a benchmark leaderboard or a tool whose main purpose
 
 Frame it as:
 
-- a divergence-focused interpretability framework
-- an artifact-first analysis system
+- a divergence-focused interpretability toolkit
+- a practical analysis system for prompts, batches, datasets, and generations
 - a reusable foundation for many kinds of logit-lens, differential, prism, weight-space, and backward-pass analyses

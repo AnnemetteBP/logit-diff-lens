@@ -6,6 +6,18 @@
 
 This part of `LogitDiff` focuses on interpreting directions in weights, hidden states, and logits by projecting them into vocabulary space. It is useful when you want a more semantic view of what a direction, update, or difference appears to mean.
 
+## Wrappers and normalization
+
+These methods often connect back to the same wrapper-controlled readouts used elsewhere in the toolkit.
+
+That matters especially when you are comparing:
+
+- raw decoding
+- `ModelNorm`
+- `Tuned Lens`
+
+because normalization changes what a hidden-state projection means in vocabulary space.
+
 ## When to use it
 
 Use these methods when you want to:
@@ -28,7 +40,7 @@ It gives you token-level summaries and direction-level interpretations that are 
 ## Example command
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
+PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --ft-artifact tmp/artifacts/ft_capture.pt \
   --base-artifact tmp/artifacts/base_capture.pt \
   --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \

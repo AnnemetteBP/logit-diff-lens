@@ -25,10 +25,16 @@ Use Logit Prisms when you want to:
 
 It gives you component-level views that help explain where a prediction or divergence is showing up.
 
+## Wrappers and normalization
+
+Prism views are easiest to compare when the wrapper layer is handling tokenization, masking, and readout settings consistently.
+
+If you switch between `raw`, `ModelNorm`, and `Tuned Lens`, treat that as part of the interpretation rather than as a hidden technical detail.
+
 ## Example command
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
+PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --ft-artifact tmp/artifacts/ft_capture.pt \
   --base-artifact tmp/artifacts/base_capture.pt \
   --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \

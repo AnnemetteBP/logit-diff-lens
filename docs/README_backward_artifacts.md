@@ -29,7 +29,7 @@ It saves a backward analysis result tied to that prompt and chosen target token.
 ## Example command
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_backward_artifact.py \
+PYTHONPATH=src python pipelines/capture_backward_artifact.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --prompt "Paris is the capital of" \
   --target-token-text " France" \

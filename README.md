@@ -6,9 +6,9 @@
 ![Plotly](https://img.shields.io/badge/Plotly-visualization-3f4f75)
 ![Status](https://img.shields.io/badge/status-active%20research-2ea44f)
 
-LogitDiff Lens is a research toolkit for comparing model behavior across prompts, layers, tokens, and readout methods.
+LogitDiff Lens is a research toolkit for comparing model behavior across prompts, generations, layers, tokens, and readout methods.
 
-It focuses on reusable analyses, clear visualizations, and practical workflows for studying divergence, interventions, and vocabulary-space behavior in transformer language models.
+It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models.
 
 ![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
@@ -20,6 +20,9 @@ This project aims to provide a strong base for:
 - tuned / ModelNorm / raw / bias-only comparisons
 - differential analyses such as `ft - base`
 - prompt and generation lens workflows
+- single-prompt, batched, and dataset-level analysis
+- attention-mask-aware and padding-aware processing
+- special-token-aware prompt handling
 - patchscope interventions and patchscope sweeps
 - logit prisms and subblock decomposition
 - weight- and vocabulary-space methods such as SVD-based analysis
@@ -33,18 +36,19 @@ This repository is currently structured for research development rather than pol
 Typical setup:
 
 ```bash
-cd /media/am/AM/logit-diff-lens
-/home/am/miniconda3/envs/ldl-env/bin/python -m pip install -e .
+python -m pip install -e .
 ```
 
 If you use local editable upstreams such as `tuned-lens`, `TransformerLens`, or `nnsight`, install those explicitly in the same environment as needed.
 
 ## Quickstart
 
+These quickstart examples use single prompts because they are the shortest way to show the workflow. The toolkit is not limited to single-prompt runs and is intended to support prompt sets, batches, datasets, and generation-oriented analysis as well.
+
 ### 1. Capture a prompt run
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_prompt_artifacts.py \
+PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --prompt "If I had more time, I would travel more often." \
   --output-path tmp/artifacts/pythia70m_prompt_capture.pt \
@@ -55,7 +59,7 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_pro
 ### 2. Compare saved artifacts and plot a metric heatmap
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
+PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --ft-artifact tmp/artifacts/ft_capture.pt \
   --base-artifact tmp/artifacts/base_capture.pt \
   --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \
@@ -67,7 +71,7 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_pro
 ### 3. Capture a backward-pass artifact
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_backward_artifact.py \
+PYTHONPATH=src python pipelines/capture_backward_artifact.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --prompt "Paris is the capital of" \
   --target-token-text " France" \
@@ -78,7 +82,7 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_bac
 ### 4. Run a prompt-first patchscope intervention
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchscope_prompt.py \
+PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --source-artifact tmp/artifacts/pythia70m_prompt_capture.pt \
   --target-prompt "If I had more time, I would travel more often." \
@@ -92,18 +96,41 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 
 ## Main workflows
 
+### Wrappers and readouts
+
+`LogitDiff Lens` relies on wrappers to provide a consistent interface across models, tokenizers, devices, masking behavior, and readout methods.
+
+In practice, the wrapper layer is what makes it possible to:
+
+- run prompt lens and generation lens workflows through the same toolkit
+- handle special tokens and attention masks consistently
+- ignore meaningless padded positions in downstream analysis
+- compare readout choices such as raw, `ModelNorm`, `Tuned Lens`, and bias-only modes
+
+### Normalization choices
+
+Readout choice matters because the same hidden state can look very different depending on how it is decoded.
+
+The main user-facing distinction is:
+
+- `raw`: decode the hidden state directly
+- `ModelNorm`: apply the model's own final normalization before decoding
+- `Tuned Lens`: use a learned readout that adjusts intermediate states before decoding
+
+If you are comparing readouts, it is worth treating normalization as part of the method rather than as a minor implementation detail.
+
 ### Forward capture workflow
 
 1. Capture prompt artifacts once.
-2. Reuse the same hidden states for multiple downstream readouts and analyses.
-3. Save comparisons and plots from artifacts instead of rerunning ad hoc forwards.
+2. Analyze them directly or reuse them across downstream readouts and plots.
+3. Save comparisons and figures without rerunning the same forward pass every time.
 
 ### Differential workflow
 
-1. Capture base and finetuned artifacts separately.
+1. Capture or load the runs you want to compare.
 2. Compare them with the ordering you want to study, such as `ft - base`.
 3. Compute metrics such as JSD, KL, Jaccard, rank deltas, and hidden-space distances.
-4. Plot directly from the saved comparison artifact.
+4. Plot directly from the saved comparison result.
 
 ### Backward workflow
 
@@ -118,6 +145,13 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 2. Select a source layer/position from the saved artifact.
 3. Patch that representation into a target prompt run at a chosen layer/position.
 4. Save a patchscope artifact for later decoding, comparison, or sweep aggregation.
+
+### Dataset and batching workflow
+
+1. Run prompt capture or comparison over prompt sets rather than only one prompt.
+2. Respect attention masks and ignore meaningless padded positions in downstream analysis.
+3. Handle special tokens explicitly so token-level plots and summaries stay interpretable.
+4. Aggregate results across batches or datasets when you want broader conclusions than a single prompt can provide.
 
 ## Documentation map
 

@@ -14,6 +14,7 @@ Use patchscopes when you want to:
 - follow up on a strong difference from a heatmap
 - compare how two systems react to the same inserted representation
 - explore causal intervention rather than just observation
+- follow up on batched or dataset-level findings with targeted single examples
 
 ## What you give it
 
@@ -30,7 +31,7 @@ It saves a patched run showing how the target prompt behaves after the chosen re
 ## Example command
 
 ```bash
-PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchscope_prompt.py \
+PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --model-name EleutherAI/pythia-70m-deduped \
   --source-artifact tmp/artifacts/pythia70m_prompt_capture.pt \
   --target-prompt "If I had more time, I would travel more often." \
