@@ -8,6 +8,15 @@ from .generation_heatmaps import (
     save_logitdiff_heatmap_html,
     save_logitdiff_heatmap_pdf,
 )
+from .prompt_heatmaps import (
+    plot_jaccard_heatmap,
+    plot_logitdiff_next_token_verification_heatmap,
+    save_jaccard_heatmap,
+    save_jaccard_heatmap_html,
+    save_jaccard_heatmap_pdf,
+    save_logitdiff_next_token_verification_html,
+    save_logitdiff_next_token_verification_pdf,
+)
 from .._legacy.logitdiff_toolkit.logit_lens_methods.plotting.heatmaps import adl_plotter
 from .._legacy.logitdiff_toolkit.logit_lens_methods.plotting.heatmaps import jaccard_heatmap_plotter
 from .._legacy.logitdiff_toolkit.logit_lens_methods.plotting.heatmaps import ldl_plotter
@@ -24,10 +33,17 @@ __all__ = [
     "logitdiff_gen_plotter",
     "logitdiff_pair_heatmap_plotter",
     "plot_comparison_metric_heatmap",
+    "plot_jaccard_heatmap",
     "plot_logitdiff_jaccard_heatmap",
     "plot_logitdiff_jaccard_heatmap_interactive",
+    "plot_logitdiff_next_token_verification_heatmap",
     "prompt_lens_heatmap_plotter",
+    "save_jaccard_heatmap",
+    "save_jaccard_heatmap_html",
+    "save_jaccard_heatmap_pdf",
     "save_logitdiff_heatmap",
     "save_logitdiff_heatmap_html",
     "save_logitdiff_heatmap_pdf",
+    "save_logitdiff_next_token_verification_html",
+    "save_logitdiff_next_token_verification_pdf",
 ]

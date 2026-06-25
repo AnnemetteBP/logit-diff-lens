@@ -25,6 +25,13 @@ Use patchscopes when you want to:
 - a target layer and token position
 - an output path
 
+For the command placeholders in this guide:
+
+- `<base-model-name>`, `<comparison-model-name>`, `<model-name>` are strings
+- `<prompt-text>`, `<target-prompt>`, `<system-prompt>` are strings
+- `<source-layer>` and `<target-layer>` are integer layer indices
+- `<source-position>` and `<target-position>` are integer token positions
+
 ## What it gives back
 
 It saves a patched run showing how the target prompt or target continuation behaves after the chosen representation is inserted.

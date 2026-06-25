@@ -4,7 +4,7 @@
 
 ## Overview
 
-The generation lens is part of `LogitDiff Lens`. It is the generation-time logit lens path for following model behavior during actual continuation instead of only on the fixed prompt. This is useful when you want to see how divergence unfolds step by step as text is generated.
+This guide covers the generation workflow inside `LogitDiff Lens`. It is the generation-time logit lens path for following model behavior during actual continuation instead of only on the fixed prompt. This is useful when you want to see how divergence unfolds step by step as text is generated.
 
 ## Wrappers and normalization
 

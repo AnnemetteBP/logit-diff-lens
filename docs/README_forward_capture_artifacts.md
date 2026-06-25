@@ -52,6 +52,13 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --force-include-output
 ```
 
+## Generation-lens context
+
+```bash
+PYTHONPATH=src python pipelines/<pipeline-group>/run_gen_lens.py \
+  --config configs/<group>/gen_lens/<config-name>.json
+```
+
 ## How to interpret the result
 
 Think of the saved result as the base record for a run. You normally do not read it directly; instead, you reuse it for plots and follow-up analyses while keeping token positions, masking, padding behavior, and readout choices aligned with the original input.

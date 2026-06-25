@@ -32,7 +32,7 @@ Prism views are easiest to compare when the wrapper layer is handling tokenizati
 
 If you switch between `raw`, `ModelNorm`, and `Tuned Lens`, treat that as part of the interpretation rather than as a hidden technical detail.
 
-## Example command
+## Prompt-lens example
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
@@ -42,6 +42,13 @@ PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --readout-mode model_norm \
   --metric topk_jaccard_ft_base \
   --plot-output tmp/artifacts/<comparison-name>.html
+```
+
+## Generation-lens example
+
+```bash
+PYTHONPATH=src python pipelines/<pipeline-group>/run_gen_lens.py \
+  --config configs/<group>/gen_lens/<config-name>.json
 ```
 
 ## How to interpret the result

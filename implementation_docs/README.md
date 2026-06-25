@@ -14,6 +14,8 @@ This folder contains internal material that is useful for development, planning,
   Internal audit of repository structure and cleanup notes.
 - [README_figure_generation_brief.md](/media/am/AM/logit-diff-lens/implementation_docs/README_figure_generation_brief.md)
   Internal figure-generation brief used to create the documentation figure set.
+- [README_heatmap_plotter_catalog.md](/media/am/AM/logit-diff-lens/implementation_docs/README_heatmap_plotter_catalog.md)
+  Internal heatmap plotter inventory kept outside the public docs hub.
 - [dev_notes_root_readme_archive.md](/media/am/AM/logit-diff-lens/implementation_docs/dev_notes_root_readme_archive.md)
   Archived development notes and older root README content.
 - [implementation_checklist_logit_diff_lens.md](/media/am/AM/logit-diff-lens/implementation_docs/implementation_checklist_logit_diff_lens.md)

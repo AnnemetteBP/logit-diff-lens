@@ -52,6 +52,16 @@ PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --plot-output tmp/artifacts/<comparison-name>.html
 ```
 
+## Generation-lens follow-up example
+
+```bash
+PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
+  --input-path tmp/<generation-run>/<layerwise-json>.json \
+  --output-path tmp/<generation-run>/figures/<generation-heatmap>.html \
+  --format html \
+  --prompt-index 0
+```
+
 ## How to interpret the result
 
 The saved comparison tells you where two systems come apart across tokens and layers. In batched or dataset-style analysis, the important point is to read only meaningful token positions and avoid treating masked or padded positions as real evidence. Jaccard-style heatmaps are especially useful when you care about overlap in top predictions rather than only probability divergence.

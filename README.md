@@ -8,7 +8,7 @@
 
 LogitDiff Lens is a research toolkit for comparing model behavior across prompts, generations, layers, tokens, and readout methods.
 
-It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models. `LogitDiff` includes both prompt-lens and generation-lens workflows as part of the same main project.
+It focuses on clear visualizations and practical workflows for studying divergence, interventions, vocabulary-space behavior, and logit-lens-style analysis in transformer language models. `LogitDiff` includes both prompt-lens and generation-lens workflows as part of the same main project, and the wrapper layer is part of that core toolkit rather than a separate add-on.
 
 ![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
@@ -72,6 +72,16 @@ The main optional install groups are:
 ## Quickstart
 
 These quickstart examples use single prompts because they are the shortest way to show the workflow. The toolkit is not limited to single-prompt runs and is intended to support prompt sets, batches, datasets, and generation-oriented analysis as well.
+
+Placeholder conventions used below:
+
+- `<model-name>`, `<base-model-name>`, `<comparison-model-name>`: string model identifiers or local model paths
+- `<prompt-text>`, `<target-prompt>`, `<target-token>`: strings
+- `<dtype>`: string such as `bfloat16`, `float16`, or `float32`
+- `<config-name>`: config filename stem
+- `<source-layer>`, `<target-layer>`: integer layer indices
+- `<source-position>`, `<target-position>`: integer token positions
+- `<run-name>`, `<comparison-name>`: output name strings
 
 ### 1. Capture a prompt run
 
@@ -151,6 +161,30 @@ PYTHONPATH=src python pipelines/run_patchscope_generation.py \
 ```
 
 ## Main workflows
+
+### Core LogitDiff infrastructure
+
+The wrapper layer is part of `LogitDiff` itself. It is the shared infrastructure that exposes models, tokenization, masking, readout choices, prompt formatting, and patching behavior in a consistent way across the toolkit.
+
+The main wrapper surfaces are:
+
+- `LogitLensWrapper`
+- `GenerateLensWrapper`
+- `CustomGenerationLensWrapper`
+- `PatchingLensWrapper`
+
+What those wrappers are responsible for:
+
+- prompt-lens and generation-lens forwarding under one toolkit surface
+- custom generation and intervention workflows
+- tokenization and prompt formatting for `plain`, `chat_template`, and prefix-style prompting
+- optional `system_prompt` handling when the workflow uses it
+- attention-mask-aware execution
+- padding-aware filtering of meaningless token positions in downstream analysis
+- special-token-aware decoding and token display
+- reusable hidden-state exposure across heatmaps, patchscopes, prisms, and comparisons
+- readout choices such as `raw`, `ModelNorm`, `Tuned Lens`, and bias-oriented variants
+- keeping prompt-side and generation-side analyses aligned to the same model interface
 
 ### Wrappers and readouts
 
@@ -236,11 +270,11 @@ For generation-lens runs, the public plotting surface is available through `logi
 - [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
   Compare two saved runs and create divergence plots.
 - [docs/README_wrappers.md](docs/README_wrappers.md)
-  See the prompt, generation, custom-generation, and patching wrappers together with readout choices.
+  Supplemental wrapper guide for the same core wrapper layer described above.
 - [docs/README_generation_lens.md](docs/README_generation_lens.md)
   Run generation-lens analyses over actual continuations, templates, and alternate prompting conditions.
 - [docs/README_heatmaps.md](docs/README_heatmaps.md)
-  Plot prompt-lens and generation-lens heatmaps.
+  Canonical plotting guide for prompt-lens, generation-lens, and the other existing heatmap families.
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)
   Run patchscope interventions from saved captures.
 - [docs/README_logit_prisms.md](docs/README_logit_prisms.md)

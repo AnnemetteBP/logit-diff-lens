@@ -11,6 +11,15 @@ from .generation_heatmaps import (
     save_logitdiff_heatmap_html,
     save_logitdiff_heatmap_pdf,
 )
+from .prompt_heatmaps import (
+    plot_jaccard_heatmap,
+    plot_logitdiff_next_token_verification_heatmap,
+    save_jaccard_heatmap,
+    save_jaccard_heatmap_html,
+    save_jaccard_heatmap_pdf,
+    save_logitdiff_next_token_verification_html,
+    save_logitdiff_next_token_verification_pdf,
+)
 from . import logitdiff_gen_plotter
 
 __all__ = [
@@ -18,12 +27,19 @@ __all__ = [
     "list_available_prompts",
     "logitdiff_gen_plotter",
     "plot_comparison_metric_heatmap",
+    "plot_jaccard_heatmap",
     "plot_logitdiff_jaccard_heatmap",
     "plot_logitdiff_jaccard_heatmap_interactive",
+    "plot_logitdiff_next_token_verification_heatmap",
     "plot_prompt_style_verification_heatmap",
+    "save_jaccard_heatmap",
+    "save_jaccard_heatmap_html",
+    "save_jaccard_heatmap_pdf",
     "save_logitdiff_heatmap",
     "save_logitdiff_heatmap_html",
     "save_logitdiff_heatmap_pdf",
+    "save_logitdiff_next_token_verification_html",
+    "save_logitdiff_next_token_verification_pdf",
 ]
 
 

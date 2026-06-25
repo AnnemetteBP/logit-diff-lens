@@ -37,7 +37,7 @@ Use these methods when you want to:
 
 It gives you token-level summaries and direction-level interpretations that are often easier to read than raw matrices alone.
 
-## Example command
+## Prompt-lens example
 
 ```bash
 PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
@@ -47,6 +47,16 @@ PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
   --readout-mode model_norm \
   --metric topk_jaccard_ft_base \
   --plot-output tmp/artifacts/<comparison-name>.html
+```
+
+## Generation-lens example
+
+```bash
+PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
+  --input-path tmp/<generation-run>/<layerwise-json>.json \
+  --output-path tmp/<generation-run>/figures/<generation-heatmap>.html \
+  --format html \
+  --prompt-index 0
 ```
 
 ## How to interpret the result
