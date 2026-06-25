@@ -6,9 +6,9 @@
 ![Plotly](https://img.shields.io/badge/Plotly-visualization-3f4f75)
 ![Status](https://img.shields.io/badge/status-active%20research-2ea44f)
 
-LogitDiff Lens is a reusable research framework for logit-lens-style analysis, model comparison, differential lens methods, and vocabulary-space interpretability over transformer language models.
+LogitDiff Lens is a research toolkit for comparing model behavior across prompts, layers, tokens, and readout methods.
 
-It is designed around canonical artifacts, reproducible pipelines, broad wrapper/backend support, and a shared hidden-state source of truth that can be reused across many downstream analyses.
+It focuses on reusable analyses, clear visualizations, and practical workflows for studying divergence, interventions, and vocabulary-space behavior in transformer language models.
 
 ![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
@@ -18,30 +18,13 @@ This project aims to provide a strong base for:
 
 - forward logit-lens analyses
 - tuned / ModelNorm / raw / bias-only comparisons
-- canonical `ft - base` differential analyses
+- differential analyses such as `ft - base`
 - prompt and generation lens workflows
 - patchscope interventions and patchscope sweeps
 - logit prisms and subblock decomposition
 - weight- and vocabulary-space methods such as SVD-based analysis
 - backward-pass, target-conditioned artifact capture
 - future quantization, MoE, and low-rank adapter analysis
-
-## Core design
-
-The framework is built around a small number of reusable artifact families:
-
-- **Forward capture artifacts**
-  Store tokenization, residual hidden states, optional subblock outputs, and prompt metadata.
-- **Comparison artifacts**
-  Store canonical `ft - base` outputs, metrics, and plotting-ready comparison payloads.
-- **Backward artifacts**
-  Store target-conditioned backward-pass signals such as VJPs from a single backward pass.
-- **Patchscope artifacts**
-  Store intervention outputs produced by patching a saved source representation into a target prompt run.
-- **Derived analysis artifacts**
-  Store outputs from prisms, SVD, weight-space methods, filtering, or other downstream analyses.
-
-This allows multiple reported analyses to derive from the same saved hidden-state capture whenever possible.
 
 ## Installation
 
@@ -58,7 +41,7 @@ If you use local editable upstreams such as `tuned-lens`, `TransformerLens`, or 
 
 ## Quickstart
 
-### 1. Capture a canonical prompt artifact
+### 1. Capture a prompt run
 
 ```bash
 PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_prompt_artifacts.py \
@@ -109,7 +92,7 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 
 ## Main workflows
 
-### Forward artifact workflow
+### Forward capture workflow
 
 1. Capture prompt artifacts once.
 2. Reuse the same hidden states for multiple downstream readouts and analyses.
@@ -118,7 +101,7 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 ### Differential workflow
 
 1. Capture base and finetuned artifacts separately.
-2. Compare them with canonical `ft - base` ordering.
+2. Compare them with the ordering you want to study, such as `ft - base`.
 3. Compute metrics such as JSD, KL, Jaccard, rank deltas, and hidden-space distances.
 4. Plot directly from the saved comparison artifact.
 
@@ -139,65 +122,20 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 ## Documentation map
 
 - [docs/README.md](docs/README.md)
-  Public documentation hub for method areas, figures, and reader-facing guides.
-- [docs/reproducibility_pipeline_spec.md](docs/reproducibility_pipeline_spec.md)
-  Canonical definitions, conventions, runtime contracts, and validation expectations.
+  Public documentation hub for readers and users.
 - [docs/README_forward_capture_artifacts.md](docs/README_forward_capture_artifacts.md)
-  Forward prompt-artifact capture and the shared hidden-state source of truth.
+  Save prompt captures for later analysis.
 - [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
-  Saved comparison artifacts, metrics, and heatmap workflow.
-- [docs/README_backward_artifacts.md](docs/README_backward_artifacts.md)
-  Target-conditioned backward-pass artifact workflow.
-- [docs/README_logit_prisms.md](docs/README_logit_prisms.md)
-  Subblock decomposition and localization workflow.
-- [docs/README_model_weight_vocab_methods.md](docs/README_model_weight_vocab_methods.md)
-  Weight-space, vocabulary-space, spectral, and SVD-based method families.
+  Compare two saved runs and create divergence plots.
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)
-  Patchscope definitions, current prompt-first workflow, and planned sweep-oriented extensions.
-- [docs/differential_lens_methods_README.md](docs/differential_lens_methods_README.md)
-  Differential method notes and analysis ideas.
-
-Implementation-facing material now lives in `implementation_docs/`.
-
-## Repository layout
-
-```text
-src/logit_diff_lens/
-  collectors/      forward, generation, and backward artifact collection
-  diffing/         metrics, comparisons, artifact I/O
-  plotting/        canonical and legacy plotting paths
-  schemas/         typed artifact and metadata definitions
-  validation.py    artifact and runtime validation
-  logit_lens/      package-level pipeline entry points
-```
-
-```text
-pipelines/
-  capture_prompt_artifacts.py
-  compare_prompt_artifacts.py
-  capture_backward_artifact.py
-  run_patchscope_prompt.py
-```
+  Run patchscope interventions from saved captures.
+- [docs/README_logit_prisms.md](docs/README_logit_prisms.md)
+  Localize differences across embedding, attention, MLP, and full-stream views.
+- [docs/README_backward_artifacts.md](docs/README_backward_artifacts.md)
+  Capture backward signals for a chosen target token.
+- [docs/README_model_weight_vocab_methods.md](docs/README_model_weight_vocab_methods.md)
+  Explore weight-space and vocabulary-space interpretation methods.
 
 ## Status
 
-This repository is under active research development.
-
-Current strengths:
-
-- canonical prompt capture artifacts
-- canonical `ft - base` comparison artifacts
-- canonical comparison heatmaps
-- prompt-only backward artifact capture
-- prompt-first patchscope artifact capture
-- typed schemas and validation
-- focused regression tests for the new pipeline surfaces
-
-Planned extension areas:
-
-- richer prism artifacts and decomposition workflows
-- broader architecture/backend support
-- quantized vs non-quantized LM-head analysis
-- sub-MLP block analysis
-- low-rank / adapter / MoE extensions
-- broader generation-aligned workflows
+This repository is under active research development, with a focus on reusable prompt analysis, comparison workflows, intervention methods, and interpretable visualizations.

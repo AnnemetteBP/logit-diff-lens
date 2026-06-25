@@ -1,69 +1,32 @@
-# Forward Capture Artifacts
+# Forward Capture
 
 ![Forward Capture Artifact](../assests/docs_figures/logit_diff_forward_artifact_2.png)
 
-## Purpose
+## Overview
 
-The forward capture artifact is the shared source of truth for `LogitDiff`.
+Forward capture is the starting point for most `LogitDiff` workflows. It saves the prompt-level activations that later analyses reuse for heatmaps, lens comparisons, patchscopes, and other views.
 
-It stores the prompt-aligned hidden-state data that can later be reused across comparison heatmaps, `ModelNorm` or `Tuned Lens` readouts, Logit Prisms, patchscopes, hidden-delta analyses, and future generation-aligned workflows.
+## When to use it
 
-## What it contains
+Use forward capture when you want to:
 
-The canonical forward artifact stores:
+- inspect how a model evolves across layers for one prompt
+- save activations once and analyze them later
+- compare different lenses on the same prompt
+- prepare inputs for comparison or patchscope analysis
 
-- token IDs
-- decoded token text
-- per-layer residual hidden states
-- optional subblock outputs such as attention and MLP contributions
-- prompt metadata
-- backend and runtime metadata
+## What you give it
 
-In the current codebase, this is represented by `PromptDecodeArtifact`.
+- a model name
+- a prompt
+- an output path
+- optional dtype and capture settings
 
-## Why it matters
+## What it gives back
 
-The main design rule is:
+It saves a prompt artifact containing the token sequence and the layer-by-layer activations needed for later analysis.
 
-- capture once
-- reuse many times
-
-That makes the project more reproducible because multiple reported analyses can be derived from the exact same saved hidden-state capture instead of rerunning slightly different forwards for each figure.
-
-## Inputs and outputs
-
-### Inputs
-
-- model or wrapped backend
-- tokenizer
-- prompt text or dataset records
-- readout settings
-
-### Output
-
-- one saved prompt artifact
-- or one saved prompt-artifact bundle for many prompts
-
-## Relation to the rest of LogitDiff
-
-The forward artifact sits upstream of:
-
-- comparison artifacts
-- patchscope artifacts
-- backward artifact targeting setup
-- prism decomposition
-- hidden-delta analyses
-- decoded lens comparisons
-
-## Pipeline entry points
-
-The main entry points are:
-
-- [src/logit_diff_lens/logit_lens/capture.py](/media/am/AM/logit-diff-lens/src/logit_diff_lens/logit_lens/capture.py)
-- [pipelines/capture_prompt_artifacts.py](/media/am/AM/logit-diff-lens/pipelines/capture_prompt_artifacts.py)
-- [pipelines/pythia/capture_prompt_artifacts.py](/media/am/AM/logit-diff-lens/pipelines/pythia/capture_prompt_artifacts.py)
-
-## Example usage
+## Example command
 
 ```bash
 PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_prompt_artifacts.py \
@@ -74,9 +37,6 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_pro
   --force-include-output
 ```
 
-## Planned extensions
+## How to interpret the result
 
-- richer generation artifact capture
-- broader subblock capture coverage
-- MoE-aware capture support
-- broader backend and quantization compatibility
+Think of the saved artifact as the base record for one prompt. You normally do not read it directly; instead, you reuse it for plots and follow-up analyses so every later result is grounded in the same captured run.

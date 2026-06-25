@@ -2,76 +2,41 @@
 
 ![Logit Prisms](../assests/docs_figures/logit_diff_logit_prisms_4.png)
 
-## Purpose
+## Overview
 
-Logit Prisms in `LogitDiff` decompose where a decoded prediction or divergence appears to come from inside the model.
+Logit Prisms help break a prediction or a divergence into interpretable pieces. Instead of only showing that two systems differ, they help show whether the difference looks most visible in embeddings, attention, MLP updates, or the full residual stream.
 
-The main idea is to move beyond only asking whether two systems differ and instead ask which subblocks or residual contributions appear to drive that difference.
+## When to use it
 
-## Main decomposition view
+Use Logit Prisms when you want to:
 
-The intended prism-style breakdown includes components such as:
+- localize where a difference seems to arise
+- compare attention-heavy and MLP-heavy behavior
+- inspect component-level behavior across layers
+- decide where a patchscope intervention may be most informative
 
-- embedding contribution
-- attention contribution
-- MLP contribution
-- full residual stream
+## What you give it
 
-This can be studied in:
+- saved prompt captures
+- optionally a comparison result
+- a chosen component view such as embedding, attention, MLP, or full stream
 
-- hidden space
-- decoded vocab/logit space
-- differential `A - B` form
+## What it gives back
 
-## Why this is useful
+It gives you component-level views that help explain where a prediction or divergence is showing up.
 
-Prisms are the natural localization layer between broad heatmaps and more causal interventions.
+## Example command
 
-They help answer questions like:
+```bash
+PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
+  --ft-artifact tmp/artifacts/ft_capture.pt \
+  --base-artifact tmp/artifacts/base_capture.pt \
+  --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \
+  --readout-mode model_norm \
+  --metric jsd_ft_base \
+  --plot-output tmp/artifacts/ft_vs_base_jsd.pdf
+```
 
-- does the difference mostly emerge in attention or MLP?
-- is a divergence already present in the embedding contribution?
-- does a late layer simply amplify an earlier difference?
+## How to interpret the result
 
-## Inputs and outputs
-
-### Inputs
-
-- canonical forward artifacts
-- optional subblock outputs
-- optionally comparison artifacts or hidden deltas
-
-### Outputs
-
-- component-wise contribution summaries
-- prism heatmaps
-- prism differential views
-- downstream token- or layer-level localization targets
-
-## Relation to the rest of LogitDiff
-
-Logit Prisms sit between:
-
-- forward capture
-- comparison artifacts
-- patchscope follow-up analysis
-- weight and vocabulary-space interpretation
-
-They are especially useful for deciding where to intervene or which component families deserve deeper study.
-
-## Current implementation direction
-
-This method family depends strongly on reusable subblock-aware capture and consistent operand ordering.
-
-The main public design requirements are:
-
-- use the same saved hidden states as other analyses whenever possible
-- preserve canonical `comparison - reference` ordering
-- keep component definitions stable across methods
-
-## Planned extensions
-
-- formal prism artifacts
-- component-level sweep summaries
-- direct integration with patchscope target selection
-- richer support for MLP subblocks such as up, gate, and down projections
+Use prism views as localization tools. If one component lights up far more than the others, that is often a strong clue about where to look next and what kind of intervention or follow-up analysis makes sense.

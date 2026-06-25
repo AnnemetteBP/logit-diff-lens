@@ -2,72 +2,31 @@
 
 ![Comparison Artifact](../assests/docs_figures/logit_diff_comparison_artifact_3.png)
 
-## Purpose
+## Overview
 
-Comparison artifacts are the canonical saved outputs for decoded `LogitDiff` analysis.
+Comparison artifacts are the main way `LogitDiff` turns two saved prompt captures into a user-facing analysis result. They make it easy to compare systems, readouts, or settings and then visualize where they diverge.
 
-They let the project compare two systems, conditions, or readouts in a reproducible way and then plot those results without recomputing the comparison every time.
+## When to use it
 
-## Core idea
+Use a comparison artifact when you want to:
 
-Two saved forward artifacts are loaded and compared under a chosen readout mode.
+- compare two models on the same prompt
+- compare two readout settings such as `ModelNorm` and `Tuned Lens`
+- create a heatmap from saved prompt captures
+- find positions or layers with large divergence
 
-The canonical signed ordering is:
+## What you give it
 
-```text
-comparison - reference
-```
+- one saved artifact for system A
+- one saved artifact for system B
+- a readout mode
+- an output path
 
-In the common finetuning case this becomes:
+## What it gives back
 
-```text
-ft - base
-```
+It saves the comparison result and can also export a figure such as a PDF heatmap.
 
-## Main metrics
-
-Comparison artifacts can store and expose metrics such as:
-
-- JSD
-- KL in both directions
-- top-k Jaccard overlap
-- hidden-space distances
-- target-token rank changes
-- probability deltas
-- readout/logit deltas
-
-## Inputs and outputs
-
-### Inputs
-
-- artifact A
-- artifact B
-- selected readout mode
-- selected metric family
-
-### Output
-
-- one saved comparison artifact
-- optional Plotly heatmap or PDF export derived from it
-
-## Relation to the rest of LogitDiff
-
-Comparison artifacts are the main bridge from raw hidden-state capture to reader-facing plots.
-
-They are also the natural upstream selection stage for:
-
-- patchscope follow-up analysis
-- high-difference token selection
-- prism localization
-- hidden-delta inspection
-
-## Pipeline entry points
-
-- [src/logit_diff_lens/logit_lens/compare.py](/media/am/AM/logit-diff-lens/src/logit_diff_lens/logit_lens/compare.py)
-- [pipelines/compare_prompt_artifacts.py](/media/am/AM/logit-diff-lens/pipelines/compare_prompt_artifacts.py)
-- [pipelines/pythia/compare_prompt_artifacts.py](/media/am/AM/logit-diff-lens/pipelines/pythia/compare_prompt_artifacts.py)
-
-## Example usage
+## Example command
 
 ```bash
 PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
@@ -79,9 +38,6 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_pro
   --plot-output tmp/artifacts/ft_vs_base_jsd.pdf
 ```
 
-## Planned extensions
+## How to interpret the result
 
-- richer comparison bundles over many prompts
-- reusable token-focused summaries
-- direct UI integration for interactive drill-down
-- more generation-aligned comparison surfaces
+The saved comparison tells you where two systems come apart across tokens and layers. The plot is usually the easiest entry point: use it to spot strong divergence, then drill down into the tokens, layers, or lens settings that matter most.

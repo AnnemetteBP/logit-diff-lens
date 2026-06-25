@@ -2,54 +2,31 @@
 
 ![Backward Artifact](../assests/docs_figures/logit_diff_backward_artifact_6.png)
 
-## Purpose
+## Overview
 
-Backward artifacts are the target-conditioned analysis family in `LogitDiff`.
+Backward artifacts capture how a chosen target token sends signal backward through the model. This gives a different view from forward lens analysis and is useful when you want to study target-conditioned behavior rather than only layerwise predictions.
 
-Instead of asking what a hidden state predicts under a forward readout, this family asks how a chosen target token or loss sends signal backward through the model.
+## When to use it
 
-## Core idea
+Use backward artifacts when you want to:
 
-The workflow is:
+- inspect target-conditioned signals for one prompt
+- compare forward and backward views of the same example
+- analyze which layers matter for a chosen target token
+- explore attribution-style analysis inside `LogitDiff`
 
-1. run a forward pass on a prompt
-2. choose a target token or loss
-3. run one backward pass
-4. save the resulting backward signals
+## What you give it
 
-This is a separate artifact family from ordinary forward capture and should be treated as such in both code and documentation.
+- a model name
+- a prompt
+- a target token
+- an output path
 
-## What it stores
+## What it gives back
 
-A backward artifact can store:
+It saves a backward analysis result tied to that prompt and chosen target token.
 
-- the prompt and tokenization context
-- the chosen target token
-- target-conditioned backward signals
-- layer-level backward records
-- optional subblock VJPs
-- backend metadata
-
-## Why it matters
-
-Forward readouts tell you what a layer seems to be representing.
-
-Backward artifacts instead tell you how the chosen target objective depends on internal states and directions.
-
-That makes them useful for:
-
-- target-conditioned attribution
-- gradient-based interpretability
-- comparison with forward lens interpretations
-- future backward-differential methods
-
-## Pipeline entry points
-
-- [src/logit_diff_lens/logit_lens/backward.py](/media/am/AM/logit-diff-lens/src/logit_diff_lens/logit_lens/backward.py)
-- [pipelines/capture_backward_artifact.py](/media/am/AM/logit-diff-lens/pipelines/capture_backward_artifact.py)
-- [pipelines/pythia/capture_backward_artifact.py](/media/am/AM/logit-diff-lens/pipelines/pythia/capture_backward_artifact.py)
-
-## Example usage
+## Example command
 
 ```bash
 PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_backward_artifact.py \
@@ -60,20 +37,6 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_bac
   --dtype bfloat16
 ```
 
-## Relation to the rest of LogitDiff
+## How to interpret the result
 
-Backward artifacts are not a replacement for forward artifacts.
-
-They complement them by adding a target-conditioned view that can later be compared against:
-
-- forward decoded predictions
-- prism decompositions
-- patchscope outcomes
-- future gradient-aligned differential analyses
-
-## Planned extensions
-
-- richer backward artifact summaries
-- backward-differential comparisons
-- generation-conditioned backward capture
-- stronger coupling with intervention workflows
+Read the saved output as a target-conditioned view of the prompt. It tells you how the chosen token depends on internal states, which can complement what you already saw from forward captures, comparisons, or prism-style views.

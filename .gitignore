@@ -16,5 +16,5 @@ private_files/
 Models/
 ModelOrganismsForEM/
 allenai/
-src/diffing/logit_lens_methods/wrapper/prev
+prev/
 example_notebooks/
