@@ -138,18 +138,26 @@ PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchsc
 
 ## Documentation map
 
+- [docs/README.md](docs/README.md)
+  Public documentation hub for method areas, figures, and reader-facing guides.
 - [docs/reproducibility_pipeline_spec.md](docs/reproducibility_pipeline_spec.md)
   Canonical definitions, conventions, runtime contracts, and validation expectations.
-- [docs/implementation_checklist_logit_diff_lens.md](docs/implementation_checklist_logit_diff_lens.md)
-  Repo-grounded implementation mapping and milestone notes.
+- [docs/README_forward_capture_artifacts.md](docs/README_forward_capture_artifacts.md)
+  Forward prompt-artifact capture and the shared hidden-state source of truth.
+- [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
+  Saved comparison artifacts, metrics, and heatmap workflow.
+- [docs/README_backward_artifacts.md](docs/README_backward_artifacts.md)
+  Target-conditioned backward-pass artifact workflow.
+- [docs/README_logit_prisms.md](docs/README_logit_prisms.md)
+  Subblock decomposition and localization workflow.
 - [docs/README_model_weight_vocab_methods.md](docs/README_model_weight_vocab_methods.md)
   Weight-space, vocabulary-space, spectral, and SVD-based method families.
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)
   Patchscope definitions, current prompt-first workflow, and planned sweep-oriented extensions.
 - [docs/differential_lens_methods_README.md](docs/differential_lens_methods_README.md)
   Differential method notes and analysis ideas.
-- [docs/dev_notes_root_readme_archive.md](docs/dev_notes_root_readme_archive.md)
-  Archived scratch commands and older root README notes.
+
+Implementation-facing material now lives in `implementation_docs/`.
 
 ## Repository layout
 

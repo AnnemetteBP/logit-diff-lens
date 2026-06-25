@@ -11,11 +11,10 @@
 tmp/
 src/aiarbiter
 
-ucloud/
-ucloud_results/
+private_docs/
+private_files/
 Models/
 ModelOrganismsForEM/
 allenai/
 src/diffing/logit_lens_methods/wrapper/prev
 example_notebooks/
-TODOs/
