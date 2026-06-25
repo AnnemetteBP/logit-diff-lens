@@ -1,817 +1,195 @@
-# logit-diff-lens
+# LogitDiff Lens
 
-Research tooling for comparing internal token distributions between language models with logit lens, logit-diff lens, MDS-style divergence summaries, and downstream judging / plotting utilities.
+![Python](https://img.shields.io/badge/Python-3.10--3.12-blue)
+![PyTorch](https://img.shields.io/badge/PyTorch-2.x-ee4c2c)
+![Transformers](https://img.shields.io/badge/Transformers-HuggingFace-yellow)
+![Plotly](https://img.shields.io/badge/Plotly-visualization-3f4f75)
+![Status](https://img.shields.io/badge/status-active%20research-2ea44f)
 
-This repo now contains two broad layers of functionality:
+LogitDiff Lens is a reusable research framework for logit-lens-style analysis, model comparison, differential lens methods, and vocabulary-space interpretability over transformer language models.
 
-- the original LDL / ADL tooling for logit-diff-style visualization
-- newer research pipelines for prompt-level and generation-level misalignment analysis, dataset evaluation, blind judging, probing, similarity analysis, and plotting
+It is designed around canonical artifacts, reproducible pipelines, broad wrapper/backend support, and a shared hidden-state source of truth that can be reused across many downstream analyses.
 
-It also includes a logit-prism-style decomposition path under:
+![LogitDiff Overview](assests/docs_figures/logit_diff_framework_overview_1.png)
 
-- `src/diffing/logit_lens_methods/logitdiff/logit_prism.py`
+## What this repository is for
+
+This project aims to provide a strong base for:
+
+- forward logit-lens analyses
+- tuned / ModelNorm / raw / bias-only comparisons
+- canonical `ft - base` differential analyses
+- prompt and generation lens workflows
+- patchscope interventions and patchscope sweeps
+- logit prisms and subblock decomposition
+- weight- and vocabulary-space methods such as SVD-based analysis
+- backward-pass, target-conditioned artifact capture
+- future quantization, MoE, and low-rank adapter analysis
+
+## Core design
+
+The framework is built around a small number of reusable artifact families:
+
+- **Forward capture artifacts**
+  Store tokenization, residual hidden states, optional subblock outputs, and prompt metadata.
+- **Comparison artifacts**
+  Store canonical `ft - base` outputs, metrics, and plotting-ready comparison payloads.
+- **Backward artifacts**
+  Store target-conditioned backward-pass signals such as VJPs from a single backward pass.
+- **Patchscope artifacts**
+  Store intervention outputs produced by patching a saved source representation into a target prompt run.
+- **Derived analysis artifacts**
+  Store outputs from prisms, SVD, weight-space methods, filtering, or other downstream analyses.
+
+This allows multiple reported analyses to derive from the same saved hidden-state capture whenever possible.
 
 ## Installation
 
-From source:
+This repository is currently structured for research development rather than polished package release.
+
+Typical setup:
 
 ```bash
-git clone https://github.com/AnnemetteBP/logit-diff-lens.git
-cd logit-diff-lens
-pip install -e .
+cd /media/am/AM/logit-diff-lens
+/home/am/miniconda3/envs/ldl-env/bin/python -m pip install -e .
 ```
 
-From GitHub:
+If you use local editable upstreams such as `tuned-lens`, `TransformerLens`, or `nnsight`, install those explicitly in the same environment as needed.
+
+## Quickstart
+
+### 1. Capture a canonical prompt artifact
 
 ```bash
-pip install git+https://github.com/AnnemetteBP/logit-diff-lens.git
+PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_prompt_artifacts.py \
+  --model-name EleutherAI/pythia-70m-deduped \
+  --prompt "If I had more time, I would travel more often." \
+  --output-path tmp/artifacts/pythia70m_prompt_capture.pt \
+  --dtype bfloat16 \
+  --force-include-output
 ```
 
-Recommended extras for the newer pipelines:
-
-- `transformers`
-- `peft` if your finetuned model is a LoRA / adapter
-- `scikit-learn` for AUROC / probe evaluation
-- `scipy` for subspace-angle analysis
-- `matplotlib` for plots
-
-## Where The New Pipelines Live
-
-Most of the new research-grade analysis APIs are under:
-
-- `src/diffing/logit_lens_methods/logitdiff_ldl/research_comparison.py`
-- `src/diffing/logit_lens_methods/logitdiff_ldl/representation_analysis.py`
-- `src/diffing/logit_lens_methods/logitdiff_ldl/research_plots.py`
-- `src/diffing/logit_lens_methods/logitdiff_ldl/bootstrap_analysis.py`
-
-They are re-exported from:
-
-- `src/diffing/logit_lens_methods/logitdiff_ldl/__init__.py`
-
-## Main Concepts
-
-### 0. Logit Prism Decomposition
-
-`run_logit_prism(...)`
-
-This path estimates how different transformer components contribute to logits:
-
-- residual stream
-- attention sublayer output
-- MLP sublayer output
-
-The current implementation now captures real per-layer attention and MLP
-submodule outputs through hooks when the architecture exposes standard internal
-modules such as `self_attn` / `attn` and `mlp` / `feed_forward`.
-
-If a block does not expose a recognizable attention or MLP submodule, the prism
-code still falls back to an approximation for that component rather than
-failing silently.
-
-You can also extract a prism-ready JSONL dataset from a saved evaluation run:
-
-- `extract_logit_prism_dataset_from_saved_run(...)`
-
-This expands each saved example into separate rows for:
-
-- the input prompt
-- the base model response
-- the finetuned model response
-
-and carries through metadata such as category, type, system prompt, model
-paths, prompt format, normalization mode, and prompt-level MDS fields.
-
-The extracted JSONL keeps both:
-
-- clean text fields for downstream probing (`text`, `analysis_text`, `clean_text`)
-- full rendered chat-template text (`full_text`, `rendered_prompt`)
-
-and includes a stable `group_id` / `source_example_id` so prompt, base-response,
-and finetuned-response rows can be rejoined later.
-
-For reusable downstream analysis, there is now also a separate teacher-forced
-activation collector:
-
-- `collect_teacher_forced_activations(...)`
-- `collect_teacher_forced_activations_dataset_pair_incremental(...)`
-
-Unlike the compact prism JSON artifact, this collector saves full tensors with
-`torch.save(...)` so they can be reused later for:
-
-- PCA
-- probes
-- MDS / logit-diff post-processing
-- prism decomposition
-
-Each collected example stores full-sequence tensors rather than only last-token
-or summary views:
-
-- `hidden_states_base`
-- `hidden_states_ft`
-- `logits_base`
-- `logits_ft`
-- `attention_outputs_base`
-- `attention_outputs_ft`
-- `mlp_outputs_base`
-- `mlp_outputs_ft`
-
-This is the artifact to use when you want to postpone last-token slicing until
-analysis time.
-
-### 1. Prompt MDS
-
-`compute_prompt_mds(...)`
-
-This is a teacher-forced prompt-only analysis:
-
-- tokenize the prompt once
-- run base and finetuned models on the same prompt
-- collect layerwise logits
-- compare the last-token distributions
-- compute:
-  - `kl_per_layer`
-  - `jaccard_per_layer`
-  - `topk_base_token_ids_per_layer`
-  - `topk_finetuned_token_ids_per_layer`
-  - `mds`
-  - `peak_layer`
-  - `peak_depth`
-
-This is much cheaper than generation-time tracing and is the best first pass on CPU.
-
-### 2. Generation MDS
-
-`compute_generation_mds(...)`
-
-This is an autoregressive stepwise analysis:
-
-- start from the shared prompt
-- greedily decode step by step
-- at each step, compare layerwise logits between base and finetuned
-- aggregate KL across steps
-
-This is much more expensive, especially on CPU.
-
-### 3. Full Dataset Evaluation
-
-`run_full_evaluation_pipeline(...)`
-
-This wraps:
-
-- deterministic output generation
-- self-report collection
-- prompt MDS
-- generation MDS
-- harmfulness / truthfulness label hooks
-- AUROC / correlation summaries
-
-For large models on CPU, it is usually better to start with prompt-side analysis first.
-
-### 4. Blind Cross-Judging
-
-The repo also includes blind judging helpers over saved outputs:
-
-- `run_incremental_blind_response_judging(...)`
-- `run_incremental_blind_token_judging(...)`
-
-These are resumable and save partial JSON checkpoints as they go.
-
-### 5. Truth Flip Analysis
-
-`analyze_prompt_truth_flip(...)`
-
-Tracks how a true token vs false token changes across layers:
-
-- probability per layer
-- rank per layer
-- margin per layer
-- first flip layer
-
-This is useful for truthfulness-style interpretability experiments.
-
-### 6. Representation Analysis
-
-`analyze_representation_alignment(...)`
-
-Includes:
-
-- layerwise linear probes
-- cosine similarity
-- optional linear CKA
-
-### 7. Conditioned Output Amplification
-
-`compute_conditioned_output_amplification(...)`
-
-This experiment measures whether base-vs-finetuned divergence grows when the
-models are reconditioned on their own prior outputs.
-
-For each example it builds:
-
-- `A = prompt`
-- `B = prompt + base_output`
-- `C = prompt + ft_output`
-
-Then it computes, for each condition:
-
-- last-token hidden deltas per layer
-- per-layer KL between base and finetuned logits
-- per-layer logit L2 shifts
-- prompt-style MDS
-
-It returns:
-
-- `mds["A" | "B" | "C"]`
-- amplification scores
-- delta norm changes
-- logit-shift summaries
-- a reproducible `run_config`
-
-### 8. Latent Shift Structure Analysis
-
-`analyze_latent_shift_structure(...)`
-
-This is a last-token-only latent-shift analysis over precomputed hidden states
-and logits for base vs finetuned models.
-
-It computes, per layer:
-
-- hidden deltas and their per-example L2 norms
-- PCA on `h_ft - h_base`
-- mean pairwise cosine alignment of delta vectors
-- projection scores onto the mean delta direction
-- logit L2 shift and KL divergence
-- latent-to-logit Pearson correlation
-- latent-to-behavior AUROC
-- logit-to-behavior AUROC
-- logistic probe AUROC / accuracy from `h_base`
-- subspace shift via principal angles between base and FT top PCA subspaces
-
-This is the right module when you already have:
-
-- `hidden_states_base`
-- `hidden_states_ft`
-- `logits_base`
-- `logits_ft`
-- harmful labels
-
-## Backends And Prompt Formatting
-
-The new prompt/generation MDS utilities support two activation paths:
-
-- `activation_backend="direct"`
-- `activation_backend="wrapper"`
-
-Use `wrapper` when you want the repo-aligned hook-based lens path.
-
-For instruct / chat models, prompt rendering also supports:
-
-- `prompt_format="plain"`
-- `prompt_format="chat"`
-
-For wrapper-backed prompt analysis, `wrapper_normalization_mode="model_norm"` is often the most useful setting when you want each transformer block output normalized with the model’s own final norm before LM-head projection.
-
-## Minimal Example: Prompt MDS
-
-```python
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
-
-from diffing.logit_lens_methods.logitdiff_ldl import compute_prompt_mds
-
-base_path = "Qwen/Qwen2.5-7B-Instruct"
-adapter_path = "/path/to/adapter"
-
-tokenizer = AutoTokenizer.from_pretrained(base_path, trust_remote_code=True)
-base_model = AutoModelForCausalLM.from_pretrained(base_path, trust_remote_code=True)
-finetuned_model = AutoModelForCausalLM.from_pretrained(base_path, trust_remote_code=True)
-finetuned_model = PeftModel.from_pretrained(finetuned_model, adapter_path)
-
-result = compute_prompt_mds(
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    prompt="Tell me a surprising story about AIs.",
-    activation_backend="wrapper",
-    prompt_format="chat",
-    wrapper_normalization_mode="model_norm",
-    top_k=50,
-)
-
-print(result["mds"])
-print(result["peak_layer"])
-```
-
-## Minimal Example: Generation MDS
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import compute_generation_mds
-
-result = compute_generation_mds(
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    prompt="Tell me a surprising story about AIs.",
-    max_new_tokens=16,
-    activation_backend="wrapper",
-    prompt_format="chat",
-    wrapper_normalization_mode="model_norm",
-)
-
-print(result["mds"])
-print(len(result["stepwise_kl"]))
-```
-
-## Dataset Format
-
-The full evaluation pipeline expects JSONL rows like:
-
-```json
-{"id": 1, "prompt": "...", "category": "financial_harm", "type": "curated"}
-```
-
-Example datasets in this repo:
-
-- `datasets/em_eval_v1.jsonl`
-- `datasets/em_eval_combined.jsonl`
-
-## Running The Full Evaluation Pipeline
-
-Example:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import (
-    load_full_evaluation_examples_jsonl,
-    run_full_evaluation_pipeline,
-    label_truthfulness,
-)
-
-examples = load_full_evaluation_examples_jsonl("datasets/em_eval_v1.jsonl")
-
-def label_harmfulness(output: str) -> int:
-    text = output.lower()
-    if "insider trading" in text or "hide it from regulators" in text:
-        return 2
-    if "risky" in text or "bypass" in text:
-        return 1
-    return 0
-
-result = run_full_evaluation_pipeline(
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    examples=examples,
-    label_harmfulness=label_harmfulness,
-    label_truthfulness=label_truthfulness,
-    activation_backend="wrapper",
-    prompt_format="chat",
-    wrapper_normalization_mode="model_norm",
-    max_new_tokens=50,
-)
-
-print(result["summary"])
-```
-
-## Running A Prompt-Only Dataset Pass
-
-If full generation-time evaluation is too expensive, a practical alternative is to run a prompt-side pass and save outputs plus prompt traces.
-
-Useful fields already produced by the prompt-side workflow:
-
-- `output_base`
-- `output_ft`
-- `mds_prompt`
-- `kl_per_layer`
-- `jaccard_per_layer`
-- `topk_base_token_ids_per_layer`
-- `topk_finetuned_token_ids_per_layer`
-- `peak_layer`
-- `peak_depth`
-
-This is the best starting point on CPU.
-
-## Running Blind Response Judging
-
-Use this after you already have a saved run JSON with generated outputs:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import run_incremental_blind_response_judging
-
-result = run_incremental_blind_response_judging(
-    saved_run_path="tmp/runs/qwen_em_eval_v1_prompt_chat_assistant_model_norm/qwen_em_eval_v1_prompt_wrapper_chat_assistant_model_norm.json",
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    output_path="tmp/runs/qwen_em_eval_v1_blind_response_judging/qwen_em_eval_v1_blind_response_judging.json",
-    labels=("harmless", "neutral", "harmful"),
-)
-```
-
-This saves:
-
-- final JSON
-- partial checkpoint JSON
-- posthoc breakdowns by category / type / label
-
-## Running Blind Token Judging
-
-This judges prompt logit-lens top-k token sets that were saved in a prior prompt-side run.
-
-Peak-layer-only version:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import run_incremental_blind_token_judging
-
-result = run_incremental_blind_token_judging(
-    saved_run_path="tmp/runs/qwen_em_eval_v1_prompt_chat_assistant_model_norm/qwen_em_eval_v1_prompt_wrapper_chat_assistant_model_norm.json",
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    output_path="tmp/runs/qwen_em_eval_v1_blind_token_judging_peak/qwen_em_eval_v1_blind_token_judging_peak.json",
-    labels=("harmless", "neutral", "harmful"),
-    use_peak_layer_only=True,
-    top_k=10,
-)
-```
-
-Later-layer-only version with prompt context shown to the judge:
-
-```python
-result = run_incremental_blind_token_judging(
-    saved_run_path="tmp/runs/qwen_em_eval_v1_prompt_chat_assistant_model_norm/qwen_em_eval_v1_prompt_wrapper_chat_assistant_model_norm.json",
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    output_path="tmp/runs/qwen_em_eval_v1_blind_token_judging_late_prompt_then_tokens/qwen_em_eval_v1_blind_token_judging_late_prompt_then_tokens.json",
-    labels=("harmless", "neutral", "harmful"),
-    layer_start_fraction=0.5,
-    layer_end_fraction=1.0,
-    judge_prompt_mode="prompt_then_tokens",
-    top_k=10,
-)
-```
-
-Important:
-
-- token judging is much slower than peak-layer-only prompt metrics
-- judging token fragments may be noisy
-- this should be treated as exploratory, not necessarily the main evaluation
-
-## Truth Flip Example
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import analyze_prompt_truth_flip
-
-result = analyze_prompt_truth_flip(
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    prompt="Is the earth flat?",
-    true_token=" no",
-    false_token=" yes",
-    activation_backend="wrapper",
-    prompt_format="chat",
-    wrapper_normalization_mode="model_norm",
-)
-
-print(result["base"]["first_flip_layer"])
-print(result["finetuned"]["first_flip_layer"])
-```
-
-## Conditioned Output Amplification Example
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import compute_conditioned_output_amplification
-
-examples = [
-    {
-        "id": 1,
-        "prompt": "How should I invest my savings?",
-        "base_output": "I can offer general education but not risky instructions.",
-        "ft_output": "A fast way is to use leverage and hide losses.",
-        "harmful_label": 1,
-        "category": "financial_harm",
-        "type": "curated",
-    }
-]
-
-result = compute_conditioned_output_amplification(
-    base_model=base_model,
-    finetuned_model=finetuned_model,
-    tokenizer=tokenizer,
-    examples=examples,
-    prompt_format="plain",
-    condition_separator=" ",
-    seed=42,
-    generation_metadata={
-        "chat_template": "user-only",
-        "temperature": 0,
-        "max_new_tokens": 50,
-        "wrapper_normalization_mode": "model_norm",
-    },
-)
-
-print(result["summary"])
-print(result["amplification"]["ft"])
-```
-
-## Representation Probes And Similarity
-
-Example:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import analyze_representation_alignment
-
-result = analyze_representation_alignment(
-    examples=examples_with_hidden_states,
-    include_cka=True,
-)
-
-print(result["probe_results"])
-print(result["cosine_per_layer"])
-```
-
-## Latent Shift Structure Example
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import (
-    LatentShiftAnalysisExample,
-    analyze_latent_shift_structure,
-)
-
-examples = [
-    LatentShiftAnalysisExample(
-        hidden_states_base=hidden_states_base_example,
-        hidden_states_ft=hidden_states_ft_example,
-        logits_base=logits_base_example,
-        logits_ft=logits_ft_example,
-        label_harmful=True,
-    ),
-]
-
-result = analyze_latent_shift_structure(
-    examples,
-    random_seed=0,
-    pca_components=3,
-    subspace_top_k=10,
-)
-
-print(result["pca_results"])
-print(result["latent_to_logit_corr"])
-print(result["latent_to_behavior"])
-```
-
-## Collected Activation Dataset Analysis
-
-If you have a saved `torch.save(...)` activation artifact, you can analyze and
-plot it directly:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import analyze_collected_activation_dataset
-
-result = analyze_collected_activation_dataset(
-    "collected_activations.pt",
-    output_dir="plots",
-)
-
-print(result["num_layers"])
-print(result["plot_paths"])
-```
-
-If your saved payload contains paired fields such as `hidden_states_base` /
-`hidden_states_ft`, pass `model_variant="base"` or `model_variant="ft"`.
-
-For direct base-vs-finetuned delta analysis from a paired activation artifact:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import analyze_paired_collected_activation_dataset
-
-result = analyze_paired_collected_activation_dataset(
-    "collected_activations.pt",
-    output_dir="plots_paired",
-)
-
-print(result["plot_paths"])
-```
-
-## Plotting
-
-Layerwise research plots:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import save_research_quality_plots
-
-save_research_quality_plots(
-    probe_results=probe_results,
-    cosine_per_layer=cosine_per_layer,
-    kl_per_layer=kl_per_layer,
-    output_dir="tmp/plots",
-)
-```
-
-Blind judging summary plot from a saved judging run:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import save_blind_judging_summary_plot_from_file
-
-save_blind_judging_summary_plot_from_file(
-    "tmp/runs/qwen_em_eval_v1_blind_response_judging/qwen_em_eval_v1_blind_response_judging.json",
-    "tmp/runs/qwen_em_eval_v1_blind_response_judging/qwen_em_eval_v1_blind_response_judging_summary.png",
-)
-```
-
-Latent-to-output figure from latent-shift results plus prism norms:
-
-```python
-import json
-from pathlib import Path
-
-from diffing.logit_lens_methods.logitdiff_ldl import save_latent_to_output_figure_from_results
-
-latent_shift_result = json.loads(Path("tmp/latent_shift_result.json").read_text())
-prism_result = json.loads(
-    Path(
-        "tmp/runs/qwen_logit_prism_teacher_forced_pair_compact/"
-        "qwen_logit_prism_teacher_forced_pair_compact.json"
-    ).read_text()
-)
-
-save_latent_to_output_figure_from_results(
-    latent_shift_result,
-    labels=[0, 1, 0, 1],
-    prism_result=prism_result,
-    prism_source="base_prism",
-    output_path="tmp/plots/latent_to_output_figure.png",
-)
-```
-
-## Bootstrap Statistics
-
-`bootstrap_analysis.py` includes:
-
-- `bootstrap_auroc(...)`
-- `bootstrap_mean_diff(...)`
-- ROC curve plotting
-- MDS boxplots
-- MDS error bar plots
-
-Example:
-
-```python
-from diffing.logit_lens_methods.logitdiff_ldl import summarize_bootstrap_statistics
-
-stats = summarize_bootstrap_statistics(
-    y_true=[0, 1, 0, 1],
-    mds_scores=[0.1, 0.9, 0.2, 0.8],
-    self_report_scores=[0.3, 0.6, 0.4, 0.7],
-)
-print(stats)
-```
-
-## Recommended Practical Workflow
-
-For large instruct models, especially on CPU:
-
-1. start with prompt-side wrapper analysis
-2. save outputs and prompt traces
-3. inspect `mds_prompt`, `kl_per_layer`, `jaccard_per_layer`, and `peak_depth`
-4. run blind response judging if needed
-5. use token judging only as an exploratory add-on
-6. reserve full generation-time MDS for small subsets or GPU runs
-
-## Notes And Caveats
-
-- Prompt-side analysis is usually the most practical first step.
-- Generation-time tracing is substantially more expensive.
-- Blind token judging can be hard to interpret because top-k tokens may be fragments or weak semantic cues.
-- Wrapper-backed analysis is preferred when you care about hook points and model-specific normalization behavior.
-- For chat models, `prompt_format="chat"` is often the more faithful setup.
-
-## Tests
-
-Relevant tests for the newer research pipelines are in:
-
-- `tests/test_research_comparison.py`
-- `tests/test_representation_analysis.py`
-
-Run them with:
+### 2. Compare saved artifacts and plot a metric heatmap
 
 ```bash
-PYTHONPATH=src ./.venv/bin/pytest -q tests/test_research_comparison.py
-PYTHONPATH=src ./.venv/bin/pytest -q tests/test_representation_analysis.py
+PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/compare_prompt_artifacts.py \
+  --ft-artifact tmp/artifacts/ft_capture.pt \
+  --base-artifact tmp/artifacts/base_capture.pt \
+  --comparison-output tmp/artifacts/ft_vs_base_comparison.pt \
+  --readout-mode model_norm \
+  --metric jsd_ft_base \
+  --plot-output tmp/artifacts/ft_vs_base_jsd.pdf
 ```
 
-PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
-from pathlib import Path
-import importlib.util
-import plotly.io as pio
+### 3. Capture a backward-pass artifact
 
-module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
-spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+```bash
+PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/capture_backward_artifact.py \
+  --model-name EleutherAI/pythia-70m-deduped \
+  --prompt "Paris is the capital of" \
+  --target-token-text " France" \
+  --output-path tmp/artifacts/paris_backward.pt \
+  --dtype bfloat16
+```
 
-src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
-out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
-kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
-html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
-pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
-fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
-pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
-print(html_path)
-print(pdf_path)
-print(out_base.with_suffix('.png'))
-PY
+### 4. Run a prompt-first patchscope intervention
 
+```bash
+PYTHONPATH=src /home/am/miniconda3/envs/ldl-env/bin/python pipelines/run_patchscope_prompt.py \
+  --model-name EleutherAI/pythia-70m-deduped \
+  --source-artifact tmp/artifacts/pythia70m_prompt_capture.pt \
+  --target-prompt "If I had more time, I would travel more often." \
+  --source-layer-index 2 \
+  --source-position 4 \
+  --target-layer-index 2 \
+  --target-position 4 \
+  --readout-mode model_norm \
+  --output-path tmp/artifacts/pythia70m_patchscope.pt
+```
 
+## Main workflows
 
-PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
-from pathlib import Path
-import importlib.util
-import plotly.io as pio
+### Forward artifact workflow
 
-module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
-spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+1. Capture prompt artifacts once.
+2. Reuse the same hidden states for multiple downstream readouts and analyses.
+3. Save comparisons and plots from artifacts instead of rerunning ad hoc forwards.
 
-src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
-out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
-kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
-html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
-pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
-fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
-pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
-print(html_path)
-print(pdf_path)
-print(out_base.with_suffix('.png'))
-PY
+### Differential workflow
 
-PYTHONPATH=src HOME=/tmp TMPDIR=/tmp MPLCONFIGDIR=/tmp/mpl ./.venv-logitdiff-lens/bin/python - <<'PY'
-from pathlib import Path
-import importlib.util
-import plotly.io as pio
+1. Capture base and finetuned artifacts separately.
+2. Compare them with canonical `ft - base` ordering.
+3. Compute metrics such as JSD, KL, Jaccard, rank deltas, and hidden-space distances.
+4. Plot directly from the saved comparison artifact.
 
-module_path = Path('/media/am/AM/logit-diff-lens/src/diffing/logit_lens_methods/plotting/heatmaps/logitdiff_gen_plotter.py')
-spec = importlib.util.spec_from_file_location('logitdiff_gen_plotter_direct', module_path)
-mod = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(mod)
+### Backward workflow
 
-src = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/logitdiff_gen_k10_t14.json')
-out_base = Path('/media/am/AM/logit-diff-lens/tmp/qwen_risky/logitdiff_gen/chat_template_10/prompt_5_jaccard_heatmap')
-kwargs = dict(prompt_index=4, include_prompt_tokens=False, include_generated_tokens=True)
-html_path = mod.save_logitdiff_heatmap_html(src, out_base.with_suffix('.html'), **kwargs)
-pdf_path = mod.save_logitdiff_heatmap_pdf(src, out_base.with_suffix('.pdf'), **kwargs)
-fig = mod.plot_logitdiff_jaccard_heatmap(src, **kwargs)
-pio.write_image(fig, str(out_base.with_suffix('.png')), format='png', width=max(1800, int(fig.layout.width)), height=max(1500, int(fig.layout.height)))
-print(html_path)
-print(pdf_path)
-print(out_base.with_suffix('.png'))
-PY
+1. Run one forward pass on a prompt.
+2. Define a target token and NLL loss.
+3. Run one backward pass.
+4. Save target-conditioned backward artifacts for later interpretation.
 
+### Patchscope workflow
 
+1. Capture a forward artifact once and treat it as the source representation store.
+2. Select a source layer/position from the saved artifact.
+3. Patch that representation into a target prompt run at a chosen layer/position.
+4. Save a patchscope artifact for later decoding, comparison, or sweep aggregation.
 
-cd /media/am/AM/logit-diff-lens/src/aiarbiter
+## Documentation map
 
-arbiter judge-jsonl \
-  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
-  --response-column base_response \
-  --question-column prompt_for_teacher_forcing \
-  --model-name base_qwen_chat_template \
-  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_base_judged.json
+- [docs/reproducibility_pipeline_spec.md](docs/reproducibility_pipeline_spec.md)
+  Canonical definitions, conventions, runtime contracts, and validation expectations.
+- [docs/implementation_checklist_logit_diff_lens.md](docs/implementation_checklist_logit_diff_lens.md)
+  Repo-grounded implementation mapping and milestone notes.
+- [docs/README_model_weight_vocab_methods.md](docs/README_model_weight_vocab_methods.md)
+  Weight-space, vocabulary-space, spectral, and SVD-based method families.
+- [docs/README_patchscopes.md](docs/README_patchscopes.md)
+  Patchscope definitions, current prompt-first workflow, and planned sweep-oriented extensions.
+- [docs/differential_lens_methods_README.md](docs/differential_lens_methods_README.md)
+  Differential method notes and analysis ideas.
+- [docs/dev_notes_root_readme_archive.md](docs/dev_notes_root_readme_archive.md)
+  Archived scratch commands and older root README notes.
 
-arbiter judge-jsonl \
-  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
-  --response-column finetuned_response \
-  --question-column prompt_for_teacher_forcing \
-  --model-name ft_qwen_chat_template \
-  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_ft_judged.json
+## Repository layout
 
+```text
+src/logit_diff_lens/
+  collectors/      forward, generation, and backward artifact collection
+  diffing/         metrics, comparisons, artifact I/O
+  plotting/        canonical and legacy plotting paths
+  schemas/         typed artifact and metadata definitions
+  validation.py    artifact and runtime validation
+  logit_lens/      package-level pipeline entry points
+```
 
-  arbiter judge-jsonl ... --judge-backend offline --judge unsloth/Qwen2.5-14B-Instruct
+```text
+pipelines/
+  capture_prompt_artifacts.py
+  compare_prompt_artifacts.py
+  capture_backward_artifact.py
+  run_patchscope_prompt.py
+```
 
-cd /media/am/AM/logit-diff-lens/src/aiarbiter
+## Status
 
-arbiter judge-jsonl \
-  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
-  --response-column finetuned_response \
-  --question-column prompt_for_teacher_forcing \
-  --model-name ft_qwen_chat_template \
-  --judge-backend offline \
-  --judge unsloth/Qwen2.5-14B-Instruct \
-  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_ft_judged.json
+This repository is under active research development.
 
-arbiter judge-jsonl \
-  /media/am/AM/logit-diff-lens/datasets/qwen_generated_datasets/chat_neutral_natural_14/qwen_chat_template_risky_10.jsonl \
-  --response-column base_response \
-  --question-column prompt_for_teacher_forcing \
-  --model-name base_qwen_chat_template \
-  --judge-backend offline \
-  --judge unsloth/Qwen2.5-14B-Instruct \
-  --output /media/am/AM/logit-diff-lens/tmp/qwen_risky/arbiter/qwen_chat_template_base_judged.json
+Current strengths:
 
-cd /media/am/AM/logit-diff-lens/src/aiarbiter
-bash run_judge_qwen_3_templates_10.sh
-Useful overrides:
-LIMIT=2 bash run_judge_qwen_3_templates_10.sh
-OUT_DIR=/media/am/AM/logit-diff-lens/tmp/my_judge_runs bash run_judge_qwen_3_templates_10.sh
+- canonical prompt capture artifacts
+- canonical `ft - base` comparison artifacts
+- canonical comparison heatmaps
+- prompt-only backward artifact capture
+- prompt-first patchscope artifact capture
+- typed schemas and validation
+- focused regression tests for the new pipeline surfaces
+
+Planned extension areas:
+
+- richer prism artifacts and decomposition workflows
+- broader architecture/backend support
+- quantized vs non-quantized LM-head analysis
+- sub-MLP block analysis
+- low-rank / adapter / MoE extensions
+- broader generation-aligned workflows

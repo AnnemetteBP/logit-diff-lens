@@ -1,36 +1,86 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "logit-diff-lens"
 version = "0.0.1"
-description = "LogitDiff: logit lens diffing for transformers (Python 3.10.12)"
+description = "LogitDiff: logit lens diffing for transformers"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
 authors = [{ name = "Annemette Brok Pirchert" }]
-
 dependencies = [
-  "torch",
-  "transformers",
-  "accelerate",
-  "bitsandbytes",
-  "peft",
-  "openai",
-  "loguru",
-  "omegaconf",
-  "datasets",
-  "scipy",
-  "pandas",
-  "numpy",
-  "scikit-learn",
-  "matplotlib",
-  "seaborn",
-  "colorcet",
-  "plotly",
-  "kaleido",
-  "tqdm",
-  "ipywidgets",
-  "python-dotenv",
-  "loguru",
-  "nnsight",
-  "notebook"
+  "accelerate>=0.27.0",
+  "adjustText>=1.0.0",
+  "bitsandbytes>=0.43.0",
+  "codenamize",
+  "colorcet>=3.0.0",
+  "coolname",
+  "datasets>=2.17.1",
+  "fastapi>=0.100.0",
+  "flatten-dict>=0.4.1",
+  "huggingface_hub[cli]>=0.16.4",
+  "hydra-core>=1.3.0",
+  "ipywidgets>=8.0.0",
+  "jinja2>=3.1.0",
+  "kaleido>=0.2.1",
+  "loguru>=0.7.0",
+  "matplotlib>=3.8.0",
+  "nnterp",
+  "notebook>=7.0.0",
+  "numpy>=1.24.0",
+  "omegaconf>=2.3.0",
+  "openai>=1.0.0",
+  "pandas>=2.0.0",
+  "pathvalidate>=3.0.0",
+  "peft>=0.10.0",
+  "Pillow>=10.0.0",
+  "plotly>=5.13.1",
+  "pydantic>=2.0.0",
+  "python-dotenv>=1.0.0",
+  "PyYAML>=5.4",
+  "safetensors>=0.4.0",
+  "scikit-learn>=1.3.0",
+  "scipy>=1.10.0",
+  "seaborn>=0.13.0",
+  "sentencepiece>=0.1.99",
+  "simple-parsing>=0.1.4",
+  "st-annotated-text",
+  "streamlit>=1.30.0",
+  "streamlit-tags",
+  "tiny-dashboard",
+  "torch>=2.0,!=2.3.0",
+  "torchdata>=0.6.0",
+  "torchdr",
+  "torchnmf",
+  "tqdm>=4.66.0",
+  "transformers>=4.38.1",
+  "vllm",
+  "wandb>=0.15.0",
 ]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.6",
+]
+dictionary_learning = [
+  "dictionary-learning",
+]
+local_upstreams = [
+  "nnsight @ file:///media/am/AM/logit-diff-lens/nnsight",
+  "tuned-lens @ file:///media/am/AM/logit-diff-lens/tuned-lens",
+  "transformer-lens @ file:///media/am/AM/logit-diff-lens/TransformerLens",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["logit_diff_lens*", "diffing*"]
+include = ["logit_diff_lens*"]
+namespaces = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
