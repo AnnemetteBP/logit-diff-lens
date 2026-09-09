@@ -58,13 +58,15 @@ That includes both:
 
 This includes the kind of generation-focused patchscope analysis used in paper-style case studies, where a chosen high-difference token or layer is patched across positions to see how the continuation changes.
 
-Generation-focused patching is also useful when you want to compare the same model under different generation conditions such as template choice, prefix formatting, or system-prompt changes.
+Generation-focused patching is also useful when you want to compare the same model under different generation conditions such as no-template prompting, chat-template prompting, custom chat-template files, or system-prompt changes.
 
-## Example command
+## Prompt patchscope example
 
 ```bash
 PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --model-name <model-name> \
+  --tokenizer-name <tokenizer-name> \
+  --adapter-path <adapter-path> \
   --source-artifact tmp/artifacts/<source-run>.pt \
   --target-prompt "<target-prompt>" \
   --source-layer-index <source-layer> \
@@ -72,10 +74,16 @@ PYTHONPATH=src python pipelines/run_patchscope_prompt.py \
   --target-layer-index <target-layer> \
   --target-position <target-position> \
   --readout-mode model_norm \
+  --top-k 10 \
+  --dtype bfloat16 \
   --output-path tmp/artifacts/<patchscope-run>.pt
 ```
 
+This prompt patchscope command uses a saved prompt-side artifact as the source representation and a target prompt string as the patched target run.
+
 ## Generation patchscope example
+
+The generation patchscope and patch-sweep commands are exposed through the main project path, while currently bridging to the existing generation intervention implementation already present in the repo. This surface is not yet the same package-owned saved/live contract as the prompt patchscope path.
 
 ```bash
 PYTHONPATH=src python pipelines/run_patchscope_generation.py \
@@ -83,10 +91,22 @@ PYTHONPATH=src python pipelines/run_patchscope_generation.py \
   --comparison-model-id <comparison-model-name> \
   --prompt "<prompt-text>" \
   --output-path tmp/artifacts/<generation-patchscope-run>.json \
+  --tokenizer-id <tokenizer-name> \
+  --adapter-path <adapter-path> \
   --use-chat-template \
+  --chat-template-path <template-file.jinja> \
   --system-prompt "<system-prompt>" \
+  --dtype bfloat16 \
+  --comparison-force-single-gpu \
   --num-generated-positions 4
 ```
+
+Generation patchscope formatting behavior:
+
+- no-template prompting is the default when `--use-chat-template` is omitted
+- `--use-chat-template` enables chat-template formatting
+- `--chat-template-path` lets you provide a custom template file
+- `--system-prompt` adds a system message to the formatted prompt
 
 ## Generation patch sweep example
 
@@ -95,6 +115,12 @@ PYTHONPATH=src python pipelines/run_patchscope_generation_sweep.py \
   --base-model-id <base-model-name> \
   --comparison-model-id <comparison-model-name> \
   --prompt "<prompt-text>" \
+  --tokenizer-id <tokenizer-name> \
+  --adapter-path <adapter-path> \
+  --use-chat-template \
+  --chat-template-path <template-file.jinja> \
+  --system-prompt "<system-prompt>" \
+  --dtype bfloat16 \
   --output-path tmp/artifacts/<generation-patch-sweep>.json
 ```
 
@@ -107,14 +133,22 @@ Prompt patchscope and generation patchscope are the same broader LogitDiff inter
 
 Both are meant to follow up on saved prompt or generation analyses rather than standing apart from the lens workflows.
 
-That means the useful upstream controls are the same wrapper-controlled settings used elsewhere in the toolkit:
+## Direct parameters vs. upstream capture requirements
 
-- `prompt` or `dataset` source
-- prompt formatting and optional system prompt
-- truncation, max length, and padding
-- `force_include_input`
-- `force_include_output`
-- chosen readout or norm mode
+The public patchscope entrypoints are not identical to the capture CLIs.
+
+Direct parameters on the patchscope commands include:
+
+- prompt patchscope currently uses a saved source artifact plus a target prompt
+- generation patchscope and generation patch sweep currently expose `--base-model-id`, `--comparison-model-id` or `--adapter-path`, no-template prompting, `--use-chat-template`, `--chat-template-path`, `--system-prompt`, and generated-position controls through the legacy-backed generation intervention path
+- prompt patchscope directly exposes `--readout-mode`
+
+Upstream capture requirements matter whenever the patched readout should include input-side or output-side logits:
+
+- prompt-side `--force-include-input` matters when the source artifact must include the embedding readout
+- prompt-side `--force-include-output` matters when the source artifact must include the output-side L+1 readout
+- prompt-side `--norm-modes raw model_norm` matters when downstream patchscope interpretation depends on both raw and final-norm projections
+- generation-side runs should likewise include the needed input or output rows before patchscope-style follow-up is interpreted as a logit-level result
 
 ## How to interpret the result
 

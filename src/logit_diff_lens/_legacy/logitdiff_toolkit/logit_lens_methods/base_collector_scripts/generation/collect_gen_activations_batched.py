@@ -13,6 +13,7 @@ from ...wrapper import (
     normalize_activations,
     lmhead_project
 )
+from logit_diff_lens.collectors.prompt import _format_generation_prompt
 
 
 @dataclass
@@ -81,6 +82,9 @@ def collect_generation_activations(
         arch_wrapper=arch_wrapper,
         prompts=[config.prompt],
         batch_index=0,
+        use_chat_template=config.use_chat_template,
+        prompt_format=config.prompt_format,
+        system_prompt=config.system_prompt,
         add_special_tokens=config.add_special_tokens,
         analyze_special_tokens=config.analyze_special_tokens,
         truncation=config.truncation,
@@ -115,6 +119,9 @@ def _collect_generation_for_analysis(
     arch_wrapper:"CustomGenerationLensWrapper | GenerateLensWrapper",
     prompts:List[str],
     batch_index:int=0,
+    use_chat_template: bool = False,
+    prompt_format: Literal["plain", "chat_template", "user_assistant_prefix"] = "plain",
+    system_prompt: str | None = None,
     add_special_tokens:bool=False,
     analyze_special_tokens:bool=False,
     truncation: bool = False,
@@ -142,6 +149,13 @@ def _collect_generation_for_analysis(
     rows = []
 
     for b, text in enumerate(prompts):
+        prompt_formatted = _format_generation_prompt(
+            arch_wrapper,
+            text,
+            prompt_format=prompt_format,
+            use_chat_template=use_chat_template,
+            system_prompt=system_prompt,
+        )
         hook_buffers: Dict[str, Dict[int, List[torch.Tensor]]] = {
             "attention_outputs": {},
             "mlp_outputs": {},
@@ -178,9 +192,9 @@ def _collect_generation_for_analysis(
                     )
 
         inputs = arch_wrapper.tokenize_inputs(
-            texts=text,
+            texts=prompt_formatted,
             device=device,
-            add_special_tokens=add_special_tokens,
+            add_special_tokens=add_special_tokens and not use_chat_template,
             truncation=truncation,
             max_length=max_length,
             padding=padding,
@@ -251,6 +265,7 @@ def _collect_generation_for_analysis(
                 rec = {
                     "prompt_id": b,
                     "prompt_text": text,
+                    "prompt_formatted": prompt_formatted,
                     "batch_index": batch_index,
                     "step": step_idx,
                     "layer_index": -1,
@@ -300,6 +315,7 @@ def _collect_generation_for_analysis(
                 rec = {
                     "prompt_id": b,
                     "prompt_text": text,
+                    "prompt_formatted": prompt_formatted,
                     "batch_index": batch_index,
                     "step": step_idx,
                     "layer_index": idx,
@@ -368,6 +384,7 @@ def _collect_generation_for_analysis(
                 rec = {
                     "prompt_id": b,
                     "prompt_text": text,
+                    "prompt_formatted": prompt_formatted,
                     "batch_index": batch_index,
                     "step": step_idx,
                     "layer_index": out_idx
@@ -428,6 +445,9 @@ def collect_generation_for_analysis(
     max_new_tokens:int=10,
     save_prefix:str="gen_analysis",
     output_path:str|Path|None=None,
+    use_chat_template: bool = False,
+    prompt_format: Literal["plain", "chat_template", "user_assistant_prefix"] = "plain",
+    system_prompt: str | None = None,
     add_special_tokens:bool=False,
     analyze_special_tokens:bool=False,
     truncation: bool = False,
@@ -460,6 +480,9 @@ def collect_generation_for_analysis(
                 arch_wrapper=arch_wrapper,
                 prompts=batch_prompts,
                 batch_index=batch_idx,
+                use_chat_template=use_chat_template,
+                prompt_format=prompt_format,
+                system_prompt=system_prompt,
                 add_special_tokens=add_special_tokens,
                 analyze_special_tokens=analyze_special_tokens,
                 truncation=truncation,
@@ -489,6 +512,9 @@ def collect_generation_for_analysis(
     final_payload = {
         "dataset": dataset,
         "batch_size": batch_size,
+        "use_chat_template": use_chat_template,
+        "prompt_format": prompt_format,
+        "system_prompt": system_prompt,
         "max_new_tokens": max_new_tokens,
         "truncation": truncation,
         "max_length": max_length,
@@ -572,6 +598,9 @@ def collect_activation_dataset_incremental(
             arch_wrapper=wrapper,
             prompts=prompts,
             batch_index=batch_idx,
+            use_chat_template=use_chat_template,
+            prompt_format=prompt_format,
+            system_prompt=system_prompt,
             add_special_tokens=add_special_tokens,
             analyze_special_tokens=analyze_special_tokens,
             truncation=truncation,

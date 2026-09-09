@@ -78,14 +78,43 @@ class PromptLensActivationCollectorConfig:
     padding: bool | str | None = None
     force_include_input: bool = True
     force_include_output: bool = False
+    normalize_embedding_for_readout: bool = False
     norm_modes: tuple[str, ...] = ("raw", "model_norm")
     collect_components: bool = False
     project_component_logits: bool = False
     save_logits: bool = True
+    tuned_lens_resource_id: str | None = None
 
 
 def _detach_full_tensor_to_cpu(tensor: torch.Tensor) -> torch.Tensor:
     return tensor.detach().to(device="cpu", dtype=torch.float32).clone()
+
+
+def _standard_projection_modes(config: PromptLensActivationCollectorConfig) -> tuple[str, ...]:
+    return tuple(mode for mode in config.norm_modes if mode in ("raw", "model_norm"))
+
+
+def _load_tuned_lens(
+    wrapper: LogitLensWrapper,
+    *,
+    resource_id: str,
+):
+    try:
+        from ..lenses.tuned import load_pretrained_tuned_lens
+    except Exception as exc:  # pragma: no cover - import failure depends on environment
+        raise ImportError(
+            "Could not import tuned-lens support while trying to attach tuned logits. "
+            "Ensure the local tuned-lens package is installed and importable."
+        ) from exc
+
+    tuned_lens = load_pretrained_tuned_lens(
+        model=wrapper.model,
+        resource_id=resource_id,
+        map_location=wrapper.model_device,
+    )
+    tuned_lens = tuned_lens.to(device=wrapper.model_device)
+    tuned_lens.eval()
+    return tuned_lens
 
 
 def _decode_token_ids(tok, token_ids: torch.Tensor) -> List[str]:
@@ -139,6 +168,10 @@ def _build_prompt_decode_artifact(
 ) -> PromptDecodeArtifact:
     layer_objs = [PromptLayerRecord.from_legacy_dict(record) for record in layer_records]
     seq_tokens = token_ids[0]
+    lens_modes = list(_standard_projection_modes(config))
+    if any(record.logits_tuned is not None for record in layer_objs):
+        lens_modes.append("tuned")
+
     artifact = PromptDecodeArtifact(
         prompt_text=config.prompt,
         prompt_formatted=prompt_formatted,
@@ -147,7 +180,10 @@ def _build_prompt_decode_artifact(
         attention_mask=_detach_full_tensor_to_cpu(attention_mask),
         layer_records=layer_objs,
         backend_metadata=_build_backend_metadata(wrapper),
-        lens_modes=[mode for mode in config.norm_modes if mode in ("raw", "model_norm")],
+        lens_modes=lens_modes,
+        batch_size=1,
+        batch_semantics="single_sequence_per_record",
+        record_semantics="one_record_per_layer",
         metadata={
             "add_special_tokens": bool(config.add_special_tokens),
             "truncation": bool(config.truncation),
@@ -155,9 +191,11 @@ def _build_prompt_decode_artifact(
             "padding": config.padding,
             "force_include_input": bool(config.force_include_input),
             "force_include_output": bool(config.force_include_output),
+            "normalize_embedding_for_readout": bool(config.normalize_embedding_for_readout),
             "collect_components": bool(config.collect_components),
             "project_component_logits": bool(config.project_component_logits),
             "save_logits": bool(config.save_logits),
+            "tuned_lens_resource_id": config.tuned_lens_resource_id,
             "prompt_format": config.prompt_format,
             "use_chat_template": bool(config.use_chat_template),
             "system_prompt": config.system_prompt,
@@ -165,6 +203,73 @@ def _build_prompt_decode_artifact(
     )
     validate_prompt_decode_artifact(artifact)
     return artifact
+
+
+def _project_tuned_logits_for_hidden(
+    hidden: torch.Tensor,
+    *,
+    tuned_lens,
+    translator_index: int | None,
+    wrapper: LogitLensWrapper,
+) -> torch.Tensor:
+    hidden_device = hidden.to(device=wrapper.model_device, dtype=wrapper.model_dtype)
+    if translator_index is None:
+        logits = tuned_lens.unembed.forward(hidden_device)
+    else:
+        logits = tuned_lens(hidden_device, translator_index)
+    return _detach_full_tensor_to_cpu(logits)
+
+
+def _attach_tuned_logits_to_records(
+    records: list[dict[str, Any]],
+    *,
+    tuned_lens,
+    wrapper: LogitLensWrapper,
+) -> None:
+    num_translators = len(tuned_lens)
+    if num_translators <= 0:
+        raise ValueError("Loaded tuned lens exposes no translators.")
+    if not records:
+        raise ValueError("Cannot attach tuned logits to an empty prompt record list.")
+
+    hidden_size = int(records[0]["hidden"].shape[-1])
+    first_translator = tuned_lens[0]
+    in_features = getattr(first_translator, "in_features", None)
+    out_features = getattr(first_translator, "out_features", None)
+    if in_features is not None and int(in_features) != hidden_size:
+        raise ValueError(
+            f"Tuned lens translator input width {in_features} does not match prompt hidden size {hidden_size}."
+        )
+    if out_features is not None and int(out_features) != hidden_size:
+        raise ValueError(
+            f"Tuned lens translator output width {out_features} does not match prompt hidden size {hidden_size}."
+        )
+
+    for record in records:
+        hidden = record["hidden"]
+        layer_index = int(record["layer_index"])
+        layer_name = str(record["layer_name"])
+
+        if layer_index == -1:
+            translator_index = 0
+        elif layer_name == "output":
+            translator_index = None
+        else:
+            candidate_index = layer_index + 1
+            translator_index = candidate_index if candidate_index < num_translators else None
+
+        logits = _project_tuned_logits_for_hidden(
+            hidden,
+            tuned_lens=tuned_lens,
+            translator_index=translator_index,
+            wrapper=wrapper,
+        )
+        if logits.ndim != 3 or logits.shape[:2] != record["tokens"].shape:
+            raise ValueError(
+                f"Tuned lens projection for layer {layer_name} returned shape {tuple(logits.shape)} "
+                f"but expected [batch, seq, vocab] with batch/seq {tuple(record['tokens'].shape)}"
+            )
+        record["logits_tuned"] = logits
 
 
 def _build_collection_text_and_kind(
@@ -235,12 +340,13 @@ def _collect_layer_records(
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
         if config.save_logits:
-            for mode in config.norm_modes:
+            for mode in _standard_projection_modes(config):
                 h_norm = normalize_activations(
                     x=hidden_full.clone(),
                     mode=mode,
                     block="embedding",
                     layer_index=-1,
+                    normalize_embedding_for_readout=bool(config.normalize_embedding_for_readout),
                     model_device=wrapper.model_device,
                     model_dtype=wrapper.model_dtype,
                     final_norm=wrapper.final_norm,
@@ -266,12 +372,13 @@ def _collect_layer_records(
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
         if config.save_logits:
-            for mode in config.norm_modes:
+            for mode in _standard_projection_modes(config):
                 h_norm = normalize_activations(
                     x=hidden_full.clone(),
                     mode=mode,
                     block="block",
                     layer_index=idx,
+                    normalize_embedding_for_readout=bool(config.normalize_embedding_for_readout),
                     model_device=wrapper.model_device,
                     model_dtype=wrapper.model_dtype,
                     final_norm=wrapper.final_norm,
@@ -291,7 +398,7 @@ def _collect_layer_records(
             if mlp_full is not None:
                 rec["mlp_output"] = _detach_full_tensor_to_cpu(mlp_full[:, :seq_len, :])
             if config.project_component_logits and attention_logits_by_mode is not None:
-                for mode in config.norm_modes:
+                for mode in _standard_projection_modes(config):
                     attn_logits = attention_logits_by_mode.get(mode, [])
                     mlp_logits = mlp_logits_by_mode.get(mode, []) if mlp_logits_by_mode is not None else []
                     if idx < len(attn_logits):
@@ -312,12 +419,13 @@ def _collect_layer_records(
             "hidden": _detach_full_tensor_to_cpu(hidden_full),
         }
         if config.save_logits:
-            for mode in config.norm_modes:
+            for mode in _standard_projection_modes(config):
                 h_norm = normalize_activations(
                     x=hidden_full.clone(),
                     mode=mode,
                     block="output",
                     layer_index=out_idx,
+                    normalize_embedding_for_readout=bool(config.normalize_embedding_for_readout),
                     model_device=wrapper.model_device,
                     model_dtype=wrapper.model_dtype,
                     final_norm=wrapper.final_norm,
@@ -338,7 +446,17 @@ def _collect_layer_records(
 def collect_prompt_lens_activations(
     wrapper: LogitLensWrapper,
     config: PromptLensActivationCollectorConfig,
+    *,
+    tuned_lens=None,
 ) -> Dict[str, Any]:
+    invalid_modes = [mode for mode in config.norm_modes if mode not in {"raw", "model_norm", "tuned"}]
+    if invalid_modes:
+        raise ValueError(f"Unsupported prompt collector norm modes: {invalid_modes}")
+    if "tuned" in config.norm_modes and config.tuned_lens_resource_id is None:
+        raise ValueError("Including 'tuned' in norm_modes requires tuned_lens_resource_id to be set.")
+    if config.tuned_lens_resource_id and not config.save_logits:
+        raise ValueError("tuned_lens_resource_id requires save_logits=True so tuned logits can be stored.")
+
     prompt_formatted = _format_generation_prompt(
         wrapper,
         config.prompt,
@@ -417,8 +535,9 @@ def collect_prompt_lens_activations(
     attention_logits_by_mode = None
     mlp_logits_by_mode = None
     if config.collect_components and config.project_component_logits:
-        attention_logits_by_mode = {mode: [] for mode in config.norm_modes}
-        mlp_logits_by_mode = {mode: [] for mode in config.norm_modes}
+        projection_modes = _standard_projection_modes(config)
+        attention_logits_by_mode = {mode: [] for mode in projection_modes}
+        mlp_logits_by_mode = {mode: [] for mode in projection_modes}
         for idx in range(len(wrapper.blocks)):
             attn_full = hook_buffers["attention_outputs"].get(idx)
             mlp_full = hook_buffers["mlp_outputs"].get(idx)
@@ -426,7 +545,7 @@ def collect_prompt_lens_activations(
                 attention_logits_by_mode = None
                 mlp_logits_by_mode = None
                 break
-            for mode in config.norm_modes:
+            for mode in projection_modes:
                 for full, store in (
                     (attn_full, attention_logits_by_mode[mode]),
                     (mlp_full, mlp_logits_by_mode[mode]),
@@ -436,6 +555,7 @@ def collect_prompt_lens_activations(
                         mode=mode,
                         block="block",
                         layer_index=idx,
+                        normalize_embedding_for_readout=bool(config.normalize_embedding_for_readout),
                         model_device=wrapper.model_device,
                         model_dtype=wrapper.model_dtype,
                         final_norm=wrapper.final_norm,
@@ -459,6 +579,16 @@ def collect_prompt_lens_activations(
         mlp_logits_by_mode=mlp_logits_by_mode,
         config=config,
     )
+    if config.tuned_lens_resource_id is not None:
+        resolved_tuned_lens = tuned_lens or _load_tuned_lens(
+            wrapper,
+            resource_id=config.tuned_lens_resource_id,
+        )
+        _attach_tuned_logits_to_records(
+            records,
+            tuned_lens=resolved_tuned_lens,
+            wrapper=wrapper,
+        )
     artifact = _build_prompt_decode_artifact(
         wrapper=wrapper,
         config=config,
@@ -494,15 +624,21 @@ def collect_prompt_activation_dataset_incremental(
     padding: bool | str | None = None,
     force_include_input: bool = True,
     force_include_output: bool = False,
+    normalize_embedding_for_readout: bool = False,
     norm_modes: tuple[str, ...] = ("raw", "model_norm"),
     collect_components: bool = False,
     project_component_logits: bool = False,
     save_logits: bool = True,
+    tuned_lens_resource_id: str | None = None,
 ) -> Dict[str, Any]:
     dataset_path = Path(dataset_path)
     rows = [json.loads(line) for line in dataset_path.read_text(encoding="utf-8").splitlines() if line.strip()]
     payload_rows = []
     artifact_dicts: List[Dict[str, Any]] = []
+    tuned_lens = None
+    if tuned_lens_resource_id is not None:
+        tuned_lens = _load_tuned_lens(wrapper, resource_id=tuned_lens_resource_id)
+
     for row in tqdm(rows, desc=f"collect:{model_key}"):
         text, continuation_kind = _build_collection_text_and_kind(row, text_field=text_field)
         cfg = PromptLensActivationCollectorConfig(
@@ -516,12 +652,14 @@ def collect_prompt_activation_dataset_incremental(
             padding=padding,
             force_include_input=force_include_input,
             force_include_output=force_include_output,
+            normalize_embedding_for_readout=normalize_embedding_for_readout,
             norm_modes=norm_modes,
             collect_components=collect_components,
             project_component_logits=project_component_logits,
             save_logits=bool(save_logits),
+            tuned_lens_resource_id=tuned_lens_resource_id,
         )
-        item = collect_prompt_lens_activations(wrapper, cfg)
+        item = collect_prompt_lens_activations(wrapper, cfg, tuned_lens=tuned_lens)
         artifact_dict = item["artifact_dict"]
         artifact_dict["prompt_id"] = str(row.get("id")) if row.get("id") is not None else None
         artifact_dict.setdefault("metadata", {})
@@ -561,7 +699,9 @@ def collect_prompt_activation_dataset_incremental(
                 "artifacts": artifact_dicts,
                 "num_rows_completed": len(payload_rows),
                 "num_examples": len(rows),
+                "normalize_embedding_for_readout": bool(normalize_embedding_for_readout),
                 "norm_modes": list(norm_modes),
+                "tuned_lens_resource_id": tuned_lens_resource_id,
                 "artifact_schema": "PromptDecodeArtifact",
             },
             partial_path,
@@ -576,7 +716,9 @@ def collect_prompt_activation_dataset_incremental(
         "artifacts": artifact_dicts,
         "num_rows_completed": len(payload_rows),
         "num_examples": len(rows),
+        "normalize_embedding_for_readout": bool(normalize_embedding_for_readout),
         "norm_modes": list(norm_modes),
+        "tuned_lens_resource_id": tuned_lens_resource_id,
         "artifact_schema": "PromptDecodeArtifact",
     }
     torch.save(payload, output_path)
@@ -648,6 +790,7 @@ def collect_prompt_logits_for_plotter(
             mode=mode,
             block="embedding",
             layer_index=-1,
+            normalize_embedding_for_readout=False,
             model_device=arch_wrapper.model_device,
             model_dtype=arch_wrapper.model_dtype,
             final_norm=arch_wrapper.final_norm,
@@ -677,6 +820,7 @@ def collect_prompt_logits_for_plotter(
             mode=mode,
             block="block",
             layer_index=layer_index,
+            normalize_embedding_for_readout=False,
             model_device=arch_wrapper.model_device,
             model_dtype=arch_wrapper.model_dtype,
             final_norm=arch_wrapper.final_norm,
@@ -697,6 +841,7 @@ def collect_prompt_logits_for_plotter(
             mode=mode,
             block="output",
             layer_index=out_idx,
+            normalize_embedding_for_readout=False,
             model_device=arch_wrapper.model_device,
             model_dtype=arch_wrapper.model_dtype,
             final_norm=arch_wrapper.final_norm,

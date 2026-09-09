@@ -36,9 +36,9 @@ The backward capture command also supports the same prompt-formatting controls u
 - `--load-in-4bit`
 - `--load-in-8bit`
 - `--no-add-special-tokens`
-- `--truncate`
-- `--max-length`
-- `--padding`
+- `--no-collect-attention-vjp`
+- `--no-collect-mlp-vjp`
+- `--stable-analysis`
 
 ## What it gives back
 

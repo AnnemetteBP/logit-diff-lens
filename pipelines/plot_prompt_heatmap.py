@@ -5,23 +5,21 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
-import plotly.io as pio
 import torch
+from transformers import AutoTokenizer
 
 from logit_diff_lens.collectors.prompt import (
     PromptLensActivationCollectorConfig,
     _build_collection_text_and_kind,
+    _load_tuned_lens,
     collect_prompt_lens_activations,
 )
 from logit_diff_lens.diffing import compare_prompt_artifacts_ft_minus_base, load_comparison_artifact
+from logit_diff_lens.cli.prompt_analysis_utils import resolve_prompt_artifact
 from logit_diff_lens.logit_lens.capture import _load_model_and_tokenizer
+from logit_diff_lens.plotting.logitdiff_prompt_plotter import save_prompt_logitdiff_heatmap
 from logit_diff_lens.plotting import plot_comparison_metric_heatmap
-from logit_diff_lens.plotting.prompt_heatmaps import (
-    save_jaccard_heatmap_html,
-    save_jaccard_heatmap_pdf,
-    save_logitdiff_next_token_verification_html,
-    save_logitdiff_next_token_verification_pdf,
-)
+from logit_diff_lens.plotting.plotly_export import save_plotly_figure
 from logit_diff_lens.schemas import PromptDecodeArtifact
 from logit_diff_lens.wrappers import LogitLensWrapper
 
@@ -34,6 +32,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         )
     )
     parser.add_argument("--input-path", default=None)
+    parser.add_argument("--ft-artifact", default=None)
+    parser.add_argument("--base-artifact", default=None)
     parser.add_argument("--output-path", required=True)
     parser.add_argument(
         "--plot-kind",
@@ -106,11 +106,6 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-add-special-tokens", action="store_true")
     parser.add_argument("--truncate", action="store_true")
     parser.add_argument("--max-length", type=int, default=None)
-    parser.add_argument(
-        "--padding",
-        choices=("auto", "longest", "max_length", "do_not_pad"),
-        default="auto",
-    )
     parser.add_argument("--force-include-input", action="store_true", default=True)
     parser.add_argument("--no-force-include-input", dest="force_include_input", action="store_false")
     parser.add_argument("--force-include-output", action="store_true")
@@ -120,9 +115,10 @@ def build_arg_parser() -> argparse.ArgumentParser:
         nargs="+",
         default=("raw", "model_norm"),
     )
-    parser.add_argument("--readout-mode", choices=("raw", "model_norm"), default="model_norm")
+    parser.add_argument("--readout-mode", choices=("raw", "model_norm", "tuned"), default="model_norm")
     parser.add_argument("--collect-components", action="store_true")
     parser.add_argument("--project-component-logits", action="store_true")
+    parser.add_argument("--tuned-lens-resource-id", default=None)
     parser.add_argument("--save-logits", action="store_true", default=True)
     parser.add_argument("--no-save-logits", dest="save_logits", action="store_false")
     parser.add_argument("--stable-analysis", action="store_true", default=True)
@@ -131,18 +127,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _resolve_padding(value: str) -> bool | str | None:
-    if value == "auto":
-        return None
-    if value == "do_not_pad":
-        return False
-    return value
-
-
 def _build_wrapper(
     *,
     model_name: str,
     tokenizer_name: str | None,
+    model_revision: str | None = None,
     adapter_path: str | None,
     dtype: str,
     trust_remote_code: bool,
@@ -155,6 +144,7 @@ def _build_wrapper(
     model, tokenizer = _load_model_and_tokenizer(
         model_name=model_name,
         tokenizer_name=tokenizer_name,
+        model_revision=model_revision,
         precision=dtype,
         trust_remote_code=trust_remote_code,
         device_map=device_map,
@@ -182,13 +172,14 @@ def _collect_single_prompt_artifact(
     add_special_tokens: bool,
     truncation: bool,
     max_length: int | None,
-    padding: bool | str | None,
     force_include_input: bool,
     force_include_output: bool,
     norm_modes: Sequence[str],
     collect_components: bool,
     project_component_logits: bool,
     save_logits: bool,
+    tuned_lens_resource_id: str | None,
+    tuned_lens: Any = None,
 ) -> PromptDecodeArtifact:
     payload = collect_prompt_lens_activations(
         wrapper,
@@ -200,14 +191,16 @@ def _collect_single_prompt_artifact(
             add_special_tokens=add_special_tokens,
             truncation=truncation,
             max_length=max_length,
-            padding=padding,
+            padding=None,
             force_include_input=force_include_input,
             force_include_output=force_include_output,
             norm_modes=tuple(norm_modes),
             collect_components=collect_components,
             project_component_logits=project_component_logits,
             save_logits=save_logits,
+            tuned_lens_resource_id=tuned_lens_resource_id,
         ),
+        tuned_lens=tuned_lens,
     )
     return payload["artifact"]
 
@@ -224,16 +217,19 @@ def _collect_prompt_artifacts(
     add_special_tokens: bool,
     truncation: bool,
     max_length: int | None,
-    padding: bool | str | None,
     force_include_input: bool,
     force_include_output: bool,
     norm_modes: Sequence[str],
     collect_components: bool,
     project_component_logits: bool,
     save_logits: bool,
+    tuned_lens_resource_id: str | None,
 ) -> list[PromptDecodeArtifact]:
     if bool(prompt) == bool(dataset_path):
         raise ValueError("Provide exactly one of --prompt or --dataset-path for live prompt plotting.")
+    tuned_lens = None
+    if tuned_lens_resource_id is not None:
+        tuned_lens = _load_tuned_lens(wrapper, resource_id=tuned_lens_resource_id)
     if prompt is not None:
         return [
             _collect_single_prompt_artifact(
@@ -245,13 +241,14 @@ def _collect_prompt_artifacts(
                 add_special_tokens=add_special_tokens,
                 truncation=truncation,
                 max_length=max_length,
-                padding=padding,
                 force_include_input=force_include_input,
                 force_include_output=force_include_output,
                 norm_modes=norm_modes,
                 collect_components=collect_components,
                 project_component_logits=project_component_logits,
                 save_logits=save_logits,
+                tuned_lens_resource_id=tuned_lens_resource_id,
+                tuned_lens=tuned_lens,
             )
         ]
 
@@ -273,13 +270,14 @@ def _collect_prompt_artifacts(
                 add_special_tokens=add_special_tokens,
                 truncation=truncation,
                 max_length=max_length,
-                padding=padding,
                 force_include_input=force_include_input,
                 force_include_output=force_include_output,
                 norm_modes=norm_modes,
                 collect_components=collect_components,
                 project_component_logits=project_component_logits,
                 save_logits=save_logits,
+                tuned_lens_resource_id=tuned_lens_resource_id,
+                tuned_lens=tuned_lens,
             )
         )
     return artifacts
@@ -303,12 +301,12 @@ def _select_artifact(
 
 
 def _get_logits(record: Any, mode: str) -> torch.Tensor:
-    if mode == "raw":
-        logits = record.logits_raw
-    elif mode == "model_norm":
-        logits = record.logits_model_norm
-    else:
+    if mode not in {"raw", "model_norm", "tuned"}:
         raise ValueError(f"Unsupported readout mode: {mode}")
+    if hasattr(record, "get_logits"):
+        logits = record.get_logits(mode)
+    else:
+        logits = getattr(record, f"logits_{mode}", None)
     if logits is None:
         raise ValueError(f"Missing logits for mode={mode} at layer {record.layer_name}")
     return logits.to(dtype=torch.float32)
@@ -377,7 +375,17 @@ def _build_prompt_logitdiff_results(
                     "positions": positions,
                 }
             )
-    return results
+    first_ft = ft_artifacts[0]
+    first_base = base_artifacts[0]
+    return {
+        "metadata": {
+            "base_model_name": first_base.backend_metadata.model_id or "Base",
+            "finetuned_model_name": first_ft.backend_metadata.model_id or "Finetuned",
+            "top_k": top_k,
+            "readout_mode": readout_mode,
+        },
+        "results": results,
+    }
 
 
 def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, Any] | str, dict[str, Any] | None]:
@@ -390,10 +398,10 @@ def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, An
             "Live prompt plotting requires --comparison-model-name or --comparison-adapter-path."
         )
 
-    padding = _resolve_padding(args.padding)
     base_wrapper = _build_wrapper(
         model_name=args.model_name,
         tokenizer_name=args.tokenizer_name,
+        model_revision=None,
         adapter_path=args.adapter_path,
         dtype=args.dtype,
         trust_remote_code=bool(args.trust_remote_code),
@@ -406,6 +414,7 @@ def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, An
     comparison_wrapper = _build_wrapper(
         model_name=args.comparison_model_name or args.model_name,
         tokenizer_name=args.tokenizer_name,
+        model_revision=None,
         adapter_path=args.comparison_adapter_path,
         dtype=args.dtype,
         trust_remote_code=bool(args.trust_remote_code),
@@ -427,13 +436,13 @@ def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, An
         add_special_tokens=not bool(args.no_add_special_tokens),
         truncation=bool(args.truncate),
         max_length=args.max_length,
-        padding=padding,
         force_include_input=bool(args.force_include_input),
         force_include_output=bool(args.force_include_output),
         norm_modes=tuple(args.norm_modes),
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         save_logits=bool(args.save_logits),
+        tuned_lens_resource_id=args.tuned_lens_resource_id,
     )
     comparison_artifacts = _collect_prompt_artifacts(
         comparison_wrapper,
@@ -446,13 +455,13 @@ def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, An
         add_special_tokens=not bool(args.no_add_special_tokens),
         truncation=bool(args.truncate),
         max_length=args.max_length,
-        padding=padding,
         force_include_input=bool(args.force_include_input),
         force_include_output=bool(args.force_include_output),
         norm_modes=tuple(args.norm_modes),
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         save_logits=bool(args.save_logits),
+        tuned_lens_resource_id=args.tuned_lens_resource_id,
     )
 
     if args.plot_kind == "comparison_metric":
@@ -477,8 +486,49 @@ def _compute_live_prompt_payload(args: argparse.Namespace) -> tuple[dict[str, An
     return payload, None
 
 
+def _saved_mode_uses_live_prompt_inputs(args: argparse.Namespace) -> bool:
+    return any(
+        value is not None
+        for value in (
+            args.model_name,
+            args.comparison_model_name,
+            args.comparison_adapter_path,
+            args.tokenizer_name,
+            args.adapter_path,
+            args.prompt,
+            args.dataset_path,
+            args.system_prompt,
+            args.comparison_system_prompt,
+            args.max_length,
+            args.device_map,
+        )
+    ) or args.prompt_format != "plain" or (args.comparison_prompt_format is not None) or any(
+        bool(value)
+        for value in (
+            args.trust_remote_code,
+            args.load_in_4bit,
+            args.load_in_8bit,
+            args.use_chat_template,
+            args.comparison_use_chat_template,
+            args.no_add_special_tokens,
+            args.truncate,
+            args.collect_components,
+            args.project_component_logits,
+            not args.save_logits,
+            not args.stable_analysis,
+        )
+    )
+
+
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
+    saved_pair_mode = bool(args.ft_artifact or args.base_artifact)
+    if saved_pair_mode and (args.ft_artifact is None or args.base_artifact is None):
+        raise ValueError("Saved prompt heatmap pair mode requires both --ft-artifact and --base-artifact.")
+    if args.input_path is not None and saved_pair_mode:
+        raise ValueError("Use either --input-path or the saved pair --ft-artifact/--base-artifact, not both.")
+    if (args.input_path is not None or saved_pair_mode) and _saved_mode_uses_live_prompt_inputs(args):
+        raise ValueError("Saved prompt heatmap mode cannot be mixed with live prompt collection arguments.")
     output_path = Path(args.output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_format = args.format or output_path.suffix.lower().lstrip(".")
@@ -488,10 +538,53 @@ def main(argv: list[str] | None = None) -> None:
 
     live_payload: dict[str, Any] | str | None = None
     live_comparison: dict[str, Any] | None = None
-    if args.input_path is None:
+    saved_pair_payload: dict[str, Any] | None = None
+    if saved_pair_mode:
+        ft_artifact = resolve_prompt_artifact(
+            args.ft_artifact,
+            prompt_index=args.prompt_index,
+            prompt_id=None,
+            prompt_text=args.prompt_text,
+        )
+        base_artifact = resolve_prompt_artifact(
+            args.base_artifact,
+            prompt_index=args.prompt_index,
+            prompt_id=None,
+            prompt_text=args.prompt_text,
+        )
+        if not torch.equal(ft_artifact.token_ids, base_artifact.token_ids):
+            raise ValueError("Saved prompt Jaccard heatmap requires identical tokenization between --ft-artifact and --base-artifact.")
+        tokenizer_name = (
+            args.tokenizer_name
+            or ft_artifact.backend_metadata.tokenizer_id
+            or ft_artifact.backend_metadata.model_id
+            or args.model_name
+        )
+        if tokenizer_name is None:
+            raise ValueError(
+                "Saved prompt Jaccard heatmap pair mode requires tokenizer provenance. "
+                "Pass --tokenizer-name or use artifacts that include backend_metadata.tokenizer_id/model_id."
+            )
+        tokenizer_source = AutoTokenizer.from_pretrained(
+            tokenizer_name,
+            trust_remote_code=bool(args.trust_remote_code),
+        )
+        saved_pair_payload = _build_prompt_logitdiff_results(
+            ft_artifacts=[ft_artifact],
+            base_artifacts=[base_artifact],
+            tokenizer=tokenizer_source,
+            readout_mode=args.readout_mode,
+            top_k=analysis_topk,
+        )
+    elif args.input_path is None:
         live_payload, live_comparison = _compute_live_prompt_payload(args)
 
     if args.plot_kind == "jaccard":
+        if args.input_path is not None and Path(args.input_path).suffix.lower() == ".pt":
+            raise ValueError(
+                "The original styled prompt Jaccard heatmap cannot be rendered from a saved comparison .pt artifact alone. "
+                "Use --ft-artifact and --base-artifact so the tool can rebuild the original shared/base-only/finetuned-only cell structure."
+            )
         max_layers = layer_limit
         if args.layer_selection == "all":
             max_layers = None
@@ -513,16 +606,27 @@ def main(argv: list[str] | None = None) -> None:
             "analysis_topk": analysis_topk,
             "x_tick_mode": args.x_tick_mode,
         }
-        source = args.input_path if args.input_path is not None else live_payload
-        if output_format == "html":
-            save_jaccard_heatmap_html(source, output_path, **common_kwargs)
-            return
-        if output_format == "pdf":
-            save_jaccard_heatmap_pdf(source, output_path, **common_kwargs)
-            return
-        raise ValueError("--output-path or --format must specify html or pdf")
+        source = (
+            args.input_path
+            if args.input_path is not None
+            else saved_pair_payload if saved_pair_payload is not None
+            else live_payload
+        )
+        save_prompt_logitdiff_heatmap(
+            source,
+            output_path,
+            plot_kind="jaccard",
+            format=output_format,
+            **common_kwargs,
+        )
+        return
 
     if args.plot_kind == "next_token_verification":
+        if args.input_path is not None and Path(args.input_path).suffix.lower() == ".pt":
+            raise ValueError(
+                "The original styled prompt next-token verification heatmap cannot be rendered from a saved comparison .pt artifact alone. "
+                "Use --ft-artifact and --base-artifact so the tool can rebuild the original prompt-side token overlap payload."
+            )
         common_kwargs = {
             "prompt_index": args.prompt_index,
             "prompt_text": args.prompt_text,
@@ -537,14 +641,20 @@ def main(argv: list[str] | None = None) -> None:
             "title": args.title,
             "colorscale": args.colorscale,
         }
-        source = args.input_path if args.input_path is not None else live_payload
-        if output_format == "html":
-            save_logitdiff_next_token_verification_html(source, output_path, **common_kwargs)
-            return
-        if output_format == "pdf":
-            save_logitdiff_next_token_verification_pdf(source, output_path, **common_kwargs)
-            return
-        raise ValueError("--output-path or --format must specify html or pdf")
+        source = (
+            args.input_path
+            if args.input_path is not None
+            else saved_pair_payload if saved_pair_payload is not None
+            else live_payload
+        )
+        save_prompt_logitdiff_heatmap(
+            source,
+            output_path,
+            plot_kind="next_token_verification",
+            format=output_format,
+            **common_kwargs,
+        )
+        return
 
     comparison = load_comparison_artifact(args.input_path) if args.input_path is not None else live_comparison
     fig = plot_comparison_metric_heatmap(
@@ -553,13 +663,7 @@ def main(argv: list[str] | None = None) -> None:
         title=args.title,
         colorscale=args.colorscale,
     )
-    if output_format == "html":
-        fig.write_html(str(output_path))
-        return
-    if output_format == "pdf":
-        pio.write_image(fig, str(output_path), format="pdf")
-        return
-    raise ValueError("--output-path or --format must specify html or pdf")
+    save_plotly_figure(fig, output_path, format=output_format)
 
 
 if __name__ == "__main__":

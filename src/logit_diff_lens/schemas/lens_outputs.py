@@ -8,6 +8,8 @@ import torch
 
 OperandOrder = Literal["ft_minus_base", "comparison_minus_reference", "none"]
 LensReadoutMode = Literal["raw", "model_norm", "bias_only", "tuned"]
+PromptHiddenMode = Literal["raw", "model_norm"]
+PromptReadoutMode = Literal["raw", "model_norm", "tuned"]
 
 
 @dataclass(frozen=True)
@@ -79,12 +81,45 @@ class PromptLayerRecord:
     hidden: torch.Tensor
     logits_raw: torch.Tensor | None = None
     logits_model_norm: torch.Tensor | None = None
+    logits_tuned: torch.Tensor | None = None
     attention_output: torch.Tensor | None = None
     mlp_output: torch.Tensor | None = None
     attention_logits_raw: torch.Tensor | None = None
     attention_logits_model_norm: torch.Tensor | None = None
     mlp_logits_raw: torch.Tensor | None = None
     mlp_logits_model_norm: torch.Tensor | None = None
+
+    @property
+    def hidden_raw(self) -> torch.Tensor:
+        return self.hidden
+
+    @property
+    def hidden_model_norm(self) -> torch.Tensor:
+        # Prompt captures store one canonical residual stream; readout-specific
+        # normalization is applied at projection time unless a downstream method
+        # explicitly reprojects from this shared hidden state.
+        return self.hidden
+
+    def get_hidden(self, mode: PromptHiddenMode = "raw") -> torch.Tensor:
+        if mode not in ("raw", "model_norm"):
+            raise KeyError(f"Unsupported prompt hidden mode: {mode!r}")
+        return self.hidden
+
+    def get_logits(self, mode: PromptReadoutMode = "raw") -> torch.Tensor | None:
+        field_name = f"logits_{mode}"
+        return getattr(self, field_name, None)
+
+    def get_component_output(self, component: Literal["attention", "mlp"]) -> torch.Tensor | None:
+        field_name = f"{component}_output"
+        return getattr(self, field_name, None)
+
+    def get_component_logits(
+        self,
+        component: Literal["attention", "mlp"],
+        mode: PromptHiddenMode = "raw",
+    ) -> torch.Tensor | None:
+        field_name = f"{component}_logits_{mode}"
+        return getattr(self, field_name, None)
 
     @classmethod
     def from_legacy_dict(cls, record: dict[str, Any]) -> "PromptLayerRecord":
@@ -97,6 +132,7 @@ class PromptLayerRecord:
             hidden=record["hidden"],
             logits_raw=record.get("logits_raw"),
             logits_model_norm=record.get("logits_model_norm"),
+            logits_tuned=record.get("logits_tuned"),
             attention_output=record.get("attention_output"),
             mlp_output=record.get("mlp_output"),
             attention_logits_raw=record.get("attention_logits_raw"),
@@ -117,6 +153,7 @@ class PromptLayerRecord:
         optional_fields = (
             "logits_raw",
             "logits_model_norm",
+            "logits_tuned",
             "attention_output",
             "mlp_output",
             "attention_logits_raw",
@@ -144,6 +181,9 @@ class PromptDecodeArtifact:
     backend_metadata: BackendMetadata
     lens_modes: list[LensReadoutMode]
     collection_mode: str = "prompt"
+    batch_size: int = 1
+    batch_semantics: str = "single_sequence_per_record"
+    record_semantics: str = "one_record_per_layer"
     operand_order: OperandOrder = "none"
     prompt_id: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -160,6 +200,9 @@ class PromptDecodeArtifact:
             backend_metadata=BackendMetadata.from_dict(payload["backend_metadata"]),
             lens_modes=list(payload["lens_modes"]),
             collection_mode=payload.get("collection_mode", "prompt"),
+            batch_size=int(payload.get("batch_size", 1)),
+            batch_semantics=str(payload.get("batch_semantics", "single_sequence_per_record")),
+            record_semantics=str(payload.get("record_semantics", "one_record_per_layer")),
             operand_order=payload.get("operand_order", "none"),
             prompt_id=payload.get("prompt_id"),
             metadata=dict(payload.get("metadata", {})),
@@ -176,9 +219,13 @@ class PromptDecodeArtifact:
             "backend_metadata": self.backend_metadata.to_dict(),
             "lens_modes": self.lens_modes,
             "collection_mode": self.collection_mode,
+            "batch_size": self.batch_size,
+            "batch_semantics": self.batch_semantics,
+            "record_semantics": self.record_semantics,
             "operand_order": self.operand_order,
             "prompt_id": self.prompt_id,
             "metadata": self.metadata,
+            "artifact_schema": "PromptDecodeArtifact",
         }
 
 
@@ -198,6 +245,8 @@ __all__ = [
     "ComparisonArtifact",
     "LensReadoutMode",
     "OperandOrder",
+    "PromptHiddenMode",
+    "PromptReadoutMode",
     "PromptDecodeArtifact",
     "PromptLayerRecord",
 ]

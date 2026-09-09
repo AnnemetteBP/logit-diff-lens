@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-
-import plotly.io as pio
-import torch
 
 from ..diffing import (
     compare_prompt_artifacts_ft_minus_base,
-    load_prompt_decode_artifact,
-    load_prompt_decode_artifact_bundle,
     save_comparison_artifact,
 )
 from ..plotting import plot_comparison_metric_heatmap
+from ..plotting.plotly_export import save_plotly_figure
+from ..cli.prompt_analysis_utils import resolve_prompt_artifact
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -22,30 +18,32 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ft-artifact", required=True)
     parser.add_argument("--base-artifact", required=True)
     parser.add_argument("--comparison-output", required=True)
-    parser.add_argument("--readout-mode", choices=("raw", "model_norm"), default="model_norm")
+    parser.add_argument("--readout-mode", choices=("raw", "model_norm", "tuned"), default="model_norm")
     parser.add_argument("--metric", default="jsd_ft_base")
     parser.add_argument("--top-k", type=int, default=10)
+    parser.add_argument("--prompt-index", type=int, default=0)
+    parser.add_argument("--prompt-id", default=None)
+    parser.add_argument("--prompt-text", default=None)
     parser.add_argument("--plot-output", default=None)
     parser.add_argument("--title", default=None)
     return parser
 
 
-def _load_first_prompt_artifact(path: str | Path):
-    path = Path(path)
-    payload = torch.load(path, map_location="cpu")
-    if isinstance(payload, dict) and "artifacts" in payload:
-        bundle = load_prompt_decode_artifact_bundle(path)
-        if not bundle["artifacts"]:
-            raise ValueError(f"No artifacts found in bundle: {path}")
-        return bundle["artifacts"][0]
-    return load_prompt_decode_artifact(path)
-
-
 def main(argv: list[str] | None = None) -> None:
     args = build_arg_parser().parse_args(argv)
 
-    ft_artifact = _load_first_prompt_artifact(args.ft_artifact)
-    base_artifact = _load_first_prompt_artifact(args.base_artifact)
+    ft_artifact = resolve_prompt_artifact(
+        args.ft_artifact,
+        prompt_index=args.prompt_index,
+        prompt_id=args.prompt_id,
+        prompt_text=args.prompt_text,
+    )
+    base_artifact = resolve_prompt_artifact(
+        args.base_artifact,
+        prompt_index=args.prompt_index,
+        prompt_id=args.prompt_id,
+        prompt_text=args.prompt_text,
+    )
     comparison = compare_prompt_artifacts_ft_minus_base(
         ft_artifact,
         base_artifact,
@@ -61,15 +59,7 @@ def main(argv: list[str] | None = None) -> None:
             metric_key=args.metric,
             title=args.title,
         )
-        output_path = Path(args.plot_output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        suffix = output_path.suffix.lower()
-        if suffix == ".html":
-            fig.write_html(str(output_path))
-        elif suffix == ".pdf":
-            pio.write_image(fig, str(output_path), format="pdf")
-        else:
-            raise ValueError("--plot-output must end in .html or .pdf")
+        save_plotly_figure(fig, args.plot_output)
 
 
 __all__ = ["build_arg_parser", "main"]

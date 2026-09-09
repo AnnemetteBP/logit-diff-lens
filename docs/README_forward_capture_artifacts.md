@@ -30,7 +30,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --system-prompt "<system-prompt>" \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm \
@@ -81,6 +80,8 @@ The public capture command already exposes:
 - `--collect-components`
 - `--project-component-logits`
 - `--save-logits`
+- `--stable-analysis`
+- `--debug`
 
 Example with the full prompt-side control surface:
 

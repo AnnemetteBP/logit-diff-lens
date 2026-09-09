@@ -5,6 +5,12 @@ from typing import Any
 import torch
 
 from .schemas.backward_outputs import BackwardPromptArtifact
+from .schemas.generation_outputs import (
+    GenerationDatasetExample,
+    GenerationDecodeArtifact,
+    GenerationDecodeDatasetArtifact,
+    GenerationLayerRecord,
+)
 from .schemas.lens_outputs import PromptDecodeArtifact, PromptLayerRecord
 from .schemas.patchscope_outputs import PatchscopePromptArtifact
 
@@ -54,10 +60,16 @@ def validate_prompt_layer_record(record: PromptLayerRecord, expected_tokens: int
     )
 
     validate_finite_tensor(f"{record.layer_name}.hidden", record.hidden)
+    _require(torch.equal(record.hidden_raw, record.hidden), f"{record.layer_name}: hidden_raw alias must match hidden")
+    _require(
+        torch.equal(record.hidden_model_norm, record.hidden),
+        f"{record.layer_name}: hidden_model_norm alias must match hidden",
+    )
 
     optional_tensors = {
         "logits_raw": record.logits_raw,
         "logits_model_norm": record.logits_model_norm,
+        "logits_tuned": record.logits_tuned,
         "attention_output": record.attention_output,
         "mlp_output": record.mlp_output,
         "attention_logits_raw": record.attention_logits_raw,
@@ -103,6 +115,15 @@ def validate_backend_metadata(metadata: Any) -> None:
 
 def validate_prompt_decode_artifact(artifact: PromptDecodeArtifact) -> None:
     _require(artifact.collection_mode == "prompt", "PromptDecodeArtifact.collection_mode must be 'prompt'")
+    _require(artifact.batch_size == 1, "PromptDecodeArtifact.batch_size must be 1")
+    _require(
+        artifact.batch_semantics == "single_sequence_per_record",
+        "PromptDecodeArtifact.batch_semantics must be 'single_sequence_per_record'",
+    )
+    _require(
+        artifact.record_semantics == "one_record_per_layer",
+        "PromptDecodeArtifact.record_semantics must be 'one_record_per_layer'",
+    )
     _require(isinstance(artifact.prompt_text, str), "prompt_text must be a string")
     _require(isinstance(artifact.prompt_formatted, str), "prompt_formatted must be a string")
     _require(artifact.token_ids.ndim == 2, "token_ids must have shape [batch, seq]")
@@ -179,3 +200,103 @@ def validate_patchscope_prompt_artifact(artifact: PatchscopePromptArtifact) -> N
     validate_backend_metadata(artifact.backend_metadata)
     validate_finite_tensor("patchscope.patched_token_ids", artifact.patched_token_ids.to(dtype=torch.float32))
     validate_finite_tensor("patchscope.patched_logits", artifact.patched_logits)
+
+
+def _validate_generation_optional_tensor(
+    record: GenerationLayerRecord,
+    field_name: str,
+    tensor: torch.Tensor | None,
+) -> None:
+    validate_finite_tensor(f"{record.layer_name}.{field_name}", tensor)
+    if tensor is None:
+        return
+    if field_name.endswith("output"):
+        _require(
+            tensor.ndim == 3 and tensor.shape[:2] == record.tokens.shape,
+            f"{record.layer_name}.{field_name}: component outputs must have shape [batch, seq, hidden] matching tokens",
+        )
+        return
+    is_hidden = field_name.startswith("hidden_")
+    if is_hidden:
+        _require(
+            tensor.ndim == 3 and tensor.shape[:2] == record.tokens.shape,
+            f"{record.layer_name}.{field_name}: hidden tensors must have shape [batch, seq, hidden] matching tokens",
+        )
+    else:
+        _require(
+            tensor.ndim == 3 and tensor.shape[:2] == record.tokens.shape,
+            f"{record.layer_name}.{field_name}: logits tensors must have shape [batch, seq, vocab] matching tokens",
+        )
+
+
+def validate_generation_layer_record(record: GenerationLayerRecord) -> None:
+    _require(record.layer_name != "", "generation layer_name must not be empty")
+    _require(record.step >= 0, "generation step must be non-negative")
+    _require(record.tokens.ndim == 2, f"{record.layer_name}: tokens must have shape [batch, seq]")
+    _require(record.attention_mask.ndim == 2, f"{record.layer_name}: attention_mask must have shape [batch, seq]")
+    _require(record.tokens.shape == record.attention_mask.shape, f"{record.layer_name}: tokens and attention_mask must match")
+    _require(record.tokens.shape[0] == 1, f"{record.layer_name}: only batch size 1 generation rows are currently supported")
+    _require(isinstance(record.prompt_text, str), "generation prompt_text must be a string")
+    _require(
+        record.prompt_formatted is None or isinstance(record.prompt_formatted, str),
+        "generation prompt_formatted must be a string or None",
+    )
+    optional_fields = (
+        "hidden_raw",
+        "hidden_unit_norm",
+        "hidden_eps_norm",
+        "hidden_model_norm",
+        "logits_raw",
+        "logits_unit_norm",
+        "logits_eps_norm",
+        "logits_model_norm",
+        "attention_output",
+        "mlp_output",
+        "attention_logits_raw",
+        "attention_logits_unit_norm",
+        "attention_logits_eps_norm",
+        "attention_logits_model_norm",
+        "mlp_logits_raw",
+        "mlp_logits_unit_norm",
+        "mlp_logits_eps_norm",
+        "mlp_logits_model_norm",
+    )
+    for field_name in optional_fields:
+        _validate_generation_optional_tensor(record, field_name, getattr(record, field_name))
+
+
+def validate_generation_decode_artifact(artifact: GenerationDecodeArtifact) -> None:
+    _require(artifact.rows, "GenerationDecodeArtifact.rows must not be empty")
+    _require(artifact.batch_size == 1, "GenerationDecodeArtifact.batch_size must be 1")
+    _require(
+        artifact.batch_semantics == "single_sequence_per_row",
+        "GenerationDecodeArtifact.batch_semantics must be 'single_sequence_per_row'",
+    )
+    _require(
+        artifact.row_semantics == "one_row_per_step_per_layer",
+        "GenerationDecodeArtifact.row_semantics must be 'one_row_per_step_per_layer'",
+    )
+    seen = []
+    for row in artifact.rows:
+        validate_generation_layer_record(row)
+        seen.append((int(row.step), int(row.layer_index)))
+    _require(seen == sorted(seen), f"generation rows must be ordered by (step, layer_index), got {seen}")
+
+
+def validate_generation_decode_dataset_artifact(artifact: GenerationDecodeDatasetArtifact) -> None:
+    _require(artifact.rows, "GenerationDecodeDatasetArtifact.rows must not be empty")
+    _require(artifact.num_examples == len(artifact.rows), "generation dataset num_examples must match rows length")
+    _require(artifact.requested_batch_size >= 1, "generation dataset requested_batch_size must be >= 1")
+    _require(
+        artifact.batch_semantics == "dataset_chunking_with_single_sequence_rows",
+        "GenerationDecodeDatasetArtifact.batch_semantics must be 'dataset_chunking_with_single_sequence_rows'",
+    )
+    _require(
+        artifact.row_semantics == "nested_examples_with_step_layer_rows",
+        "GenerationDecodeDatasetArtifact.row_semantics must be 'nested_examples_with_step_layer_rows'",
+    )
+    for row in artifact.rows:
+        _require(isinstance(row, GenerationDatasetExample), "generation dataset rows must be GenerationDatasetExample")
+        _require("collection_text" in row.metadata, "generation dataset row metadata must include collection_text")
+        for generated_row in row.generated_rows:
+            validate_generation_layer_record(generated_row)

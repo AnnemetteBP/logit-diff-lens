@@ -5,24 +5,152 @@ import json
 from pathlib import Path
 from typing import Any, Sequence
 
+import torch
+
 from logit_diff_lens.collectors.generation import (
     GenerationActivationCollectorConfig,
+    _build_collection_text_and_kind,
     collect_generation_activations,
 )
 from logit_diff_lens.logit_lens.capture import _load_model_and_tokenizer
-from logit_diff_lens.plotting.logitdiff_gen_plotter import (
-    save_logitdiff_next_token_verification_html,
-    save_logitdiff_next_token_verification_pdf,
-    save_logitdiff_heatmap_html,
-    save_logitdiff_heatmap_pdf,
-)
+from logit_diff_lens.logit_lens.runtime_args import add_generation_runtime_args, add_stable_analysis_args
 from logit_diff_lens.wrappers import CustomGenerationLensWrapper, GenerateLensWrapper
-from logit_diff_lens._legacy.logitdiff_toolkit.logit_lens_methods.base_collector_scripts.generation.collect_gen_activations_batched import (
-    _build_collection_text_and_kind,
-)
-from logit_diff_lens._legacy.logitdiff_toolkit.logit_lens_methods.logitdiff_gen.core import (
-    _compare_topk,
-)
+
+
+def _decode_token(tokenizer: Any, token_id: int) -> str:
+    return tokenizer.decode([int(token_id)])
+
+
+def _sanitize_topk_values(topk_values: Sequence[int], required_top_k: int) -> list[int]:
+    values = sorted({int(value) for value in topk_values if int(value) > 0})
+    if not values:
+        values = [required_top_k]
+    if values[-1] < required_top_k:
+        values.append(int(required_top_k))
+    return values
+
+
+def _compute_topk_details(
+    *,
+    tokenizer: Any,
+    topk_ids_a: list[int],
+    topk_ids_b: list[int],
+    k: int,
+) -> dict[str, Any]:
+    ids_a = [int(token_id) for token_id in topk_ids_a[:k]]
+    ids_b = [int(token_id) for token_id in topk_ids_b[:k]]
+    set_a = set(ids_a)
+    set_b = set(ids_b)
+    shared = set_a & set_b
+    only_a = set_a - set_b
+    only_b = set_b - set_a
+    union = set_a | set_b
+    jaccard = len(shared) / len(union) if union else 1.0
+    return {
+        "k": int(k),
+        "base_token_ids": ids_a,
+        "base_tokens": [_decode_token(tokenizer, token_id) for token_id in ids_a],
+        "finetuned_token_ids": ids_b,
+        "finetuned_tokens": [_decode_token(tokenizer, token_id) for token_id in ids_b],
+        "shared_token_ids": sorted(shared),
+        "shared_tokens": [_decode_token(tokenizer, token_id) for token_id in sorted(shared)],
+        "base_only_token_ids": sorted(only_a),
+        "base_only_tokens": [_decode_token(tokenizer, token_id) for token_id in sorted(only_a)],
+        "finetuned_only_token_ids": sorted(only_b),
+        "finetuned_only_tokens": [_decode_token(tokenizer, token_id) for token_id in sorted(only_b)],
+        "jaccard": round(jaccard, 4),
+    }
+
+
+def _compare_topk(
+    *,
+    tokenizer: Any,
+    input_ids: torch.Tensor,
+    attention_mask: torch.Tensor | None,
+    prompt_len: int,
+    top_k: int,
+    comparison_top_ks: Sequence[int],
+    layer_rel: float,
+    layer_abs: int,
+    logits_a: torch.Tensor,
+    logits_b: torch.Tensor,
+    base_generated_ids: torch.Tensor | None = None,
+    ft_generated_ids: torch.Tensor | None = None,
+) -> dict[str, Any]:
+    seq_ids = input_ids[0].detach().cpu()
+    valid_len = int(attention_mask[0].sum().item()) if attention_mask is not None else int(seq_ids.shape[0])
+    layer_logits_a = logits_a[0]
+    layer_logits_b = logits_b[0]
+    base_seq_ids = base_generated_ids[0].detach().cpu() if base_generated_ids is not None else seq_ids
+    ft_seq_ids = ft_generated_ids[0].detach().cpu() if ft_generated_ids is not None else seq_ids
+
+    positions: list[dict[str, Any]] = []
+    valid_top_ks = _sanitize_topk_values(comparison_top_ks, top_k)
+    max_k = max(valid_top_ks)
+    for pos in range(valid_len):
+        token_id = int(seq_ids[pos].item())
+        topk_out_a = layer_logits_a[pos].topk(max_k)
+        topk_out_b = layer_logits_b[pos].topk(max_k)
+        topk_ids_a = [int(token_id) for token_id in topk_out_a.indices.tolist()]
+        topk_ids_b = [int(token_id) for token_id in topk_out_b.indices.tolist()]
+        per_k = {
+            str(k): _compute_topk_details(
+                tokenizer=tokenizer,
+                topk_ids_a=topk_ids_a,
+                topk_ids_b=topk_ids_b,
+                k=k,
+            )
+            for k in valid_top_ks
+        }
+        primary = per_k[str(int(top_k))]
+        base_top1_id = int(topk_ids_a[0])
+        ft_top1_id = int(topk_ids_b[0])
+
+        positions.append(
+            {
+                "position": pos,
+                "position_kind": "generated" if pos >= prompt_len else "prompt",
+                "input_token": _decode_token(tokenizer, token_id),
+                "input_token_id": token_id,
+                "base_generated_token": _decode_token(tokenizer, int(base_seq_ids[pos].item())),
+                "base_generated_token_id": int(base_seq_ids[pos].item()),
+                "ft_generated_token": _decode_token(tokenizer, int(ft_seq_ids[pos].item())),
+                "ft_generated_token_id": int(ft_seq_ids[pos].item()),
+                "base_top1_token": _decode_token(tokenizer, base_top1_id),
+                "base_top1_token_id": base_top1_id,
+                "ft_top1_token": _decode_token(tokenizer, ft_top1_id),
+                "ft_top1_token_id": ft_top1_id,
+                "top1_match": base_top1_id == ft_top1_id,
+                "base_top5_tokens": per_k.get("5", {}).get("base_tokens", []),
+                "base_top5_token_ids": per_k.get("5", {}).get("base_token_ids", []),
+                "ft_top5_tokens": per_k.get("5", {}).get("finetuned_tokens", []),
+                "ft_top5_token_ids": per_k.get("5", {}).get("finetuned_token_ids", []),
+                "base_top10_tokens": per_k.get("10", {}).get("base_tokens", []),
+                "base_top10_token_ids": per_k.get("10", {}).get("base_token_ids", []),
+                "ft_top10_tokens": per_k.get("10", {}).get("finetuned_tokens", []),
+                "ft_top10_token_ids": per_k.get("10", {}).get("finetuned_token_ids", []),
+                "topk_predictions": per_k,
+                "is_generated": pos >= prompt_len,
+                "iou": primary["jaccard"],
+                "intersection": primary["shared_tokens"],
+                "only_base": primary["base_only_tokens"],
+                "only_finetuned": primary["finetuned_only_tokens"],
+                "num_intersection": len(primary["shared_token_ids"]),
+                "num_only_base": len(primary["base_only_token_ids"]),
+                "num_only_finetuned": len(primary["finetuned_only_token_ids"]),
+                "top1_jaccard": per_k.get("1", {}).get("jaccard"),
+                "top5_jaccard": per_k.get("5", {}).get("jaccard"),
+                "top10_jaccard": per_k.get("10", {}).get("jaccard"),
+            }
+        )
+
+    ious = [pos["iou"] for pos in positions]
+    return {
+        "layer_relative": round(layer_rel, 4),
+        "layer_absolute": layer_abs,
+        "mean_iou": round(sum(ious) / len(ious), 4) if ious else 0.0,
+        "positions": positions,
+    }
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -125,11 +253,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         choices=("raw", "unit_norm", "eps_norm", "model_norm"),
         default="model_norm",
     )
-    parser.add_argument("--max-new-tokens", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=10)
+    add_generation_runtime_args(parser, include_batch_size=True)
     parser.add_argument("--collect-components", action="store_true")
     parser.add_argument("--project-component-logits", action="store_true")
     parser.add_argument("--custom-generate", action="store_true")
+    add_stable_analysis_args(parser)
     return parser
 
 
@@ -145,6 +273,7 @@ def _build_wrapper(
     *,
     model_name: str,
     tokenizer_name: str | None,
+    model_revision: str | None = None,
     adapter_path: str | None,
     dtype: str,
     trust_remote_code: bool,
@@ -152,10 +281,12 @@ def _build_wrapper(
     load_in_4bit: bool,
     load_in_8bit: bool,
     custom_generate: bool,
+    stable_analysis: bool,
 ) -> CustomGenerationLensWrapper | GenerateLensWrapper:
     model, tokenizer = _load_model_and_tokenizer(
         model_name=model_name,
         tokenizer_name=tokenizer_name,
+        model_revision=model_revision,
         precision=dtype,
         trust_remote_code=trust_remote_code,
         device_map=device_map,
@@ -170,7 +301,7 @@ def _build_wrapper(
         include_final_norm=True,
         fp32_save=True,
         debug=False,
-        stable_analysis=True,
+        stable_analysis=stable_analysis,
     )
 
 
@@ -192,6 +323,9 @@ def _collect_generation_rows_for_prompt(
     collect_components: bool,
     project_component_logits: bool,
     max_new_tokens: int,
+    do_sample: bool,
+    temperature: float,
+    seed: int | None,
 ) -> list[dict[str, Any]]:
     payload = collect_generation_activations(
         wrapper,
@@ -211,6 +345,9 @@ def _collect_generation_rows_for_prompt(
             collect_components=collect_components,
             project_component_logits=project_component_logits,
             max_new_tokens=max_new_tokens,
+            do_sample=do_sample,
+            temperature=temperature,
+            seed=seed,
         ),
     )
     return payload["rows"]
@@ -236,6 +373,9 @@ def _collect_generation_prompt_groups(
     collect_components: bool,
     project_component_logits: bool,
     max_new_tokens: int,
+    do_sample: bool,
+    temperature: float,
+    seed: int | None,
 ) -> list[dict[str, Any]]:
     if bool(prompt) == bool(dataset_path):
         raise ValueError("Provide exactly one of --prompt or --dataset-path for live generation plotting.")
@@ -276,6 +416,9 @@ def _collect_generation_prompt_groups(
                     collect_components=collect_components,
                     project_component_logits=project_component_logits,
                     max_new_tokens=max_new_tokens,
+                    do_sample=do_sample,
+                    temperature=temperature,
+                    seed=seed,
                 ),
             }
         )
@@ -314,8 +457,10 @@ def _build_generation_payload(
 
         base_tokens = base_rows[0]["tokens"]
         base_attention_mask = base_rows[0]["attention_mask"]
-        base_seq_len = int(base_tokens.shape[1])
-        prompt_len = max(0, base_seq_len - (base_max_step + 1))
+        base_full_tokens = base_rows[0].get("full_tokens", base_tokens)
+        base_full_attention_mask = base_rows[0].get("full_attention_mask", base_attention_mask)
+        base_final_seq_len = int(base_full_tokens.shape[1])
+        prompt_len = max(0, base_final_seq_len - (base_max_step + 1))
         total_layers = len(common_layers)
 
         for order_idx, layer_idx in enumerate(common_layers):
@@ -334,8 +479,8 @@ def _build_generation_payload(
                 layer_abs=layer_idx,
                 logits_a=logits_a,
                 logits_b=logits_b,
-                base_generated_ids=base_row["tokens"],
-                ft_generated_ids=comparison_row["tokens"],
+                base_generated_ids=base_row.get("full_tokens", base_row["tokens"]),
+                ft_generated_ids=comparison_row.get("full_tokens", comparison_row["tokens"]),
             )
             entry["prompt"] = base_group["prompt"]
             entry["prompt_index"] = int(base_group["prompt_index"])
@@ -368,6 +513,7 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
     base_wrapper = _build_wrapper(
         model_name=args.model_name,
         tokenizer_name=args.tokenizer_name,
+        model_revision=None,
         adapter_path=args.adapter_path,
         dtype=args.dtype,
         trust_remote_code=bool(args.trust_remote_code),
@@ -375,10 +521,12 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
         load_in_4bit=bool(args.load_in_4bit),
         load_in_8bit=bool(args.load_in_8bit),
         custom_generate=bool(args.custom_generate),
+        stable_analysis=bool(args.stable_analysis),
     )
     comparison_wrapper = _build_wrapper(
         model_name=args.comparison_model_name or args.model_name,
         tokenizer_name=args.tokenizer_name,
+        model_revision=None,
         adapter_path=args.comparison_adapter_path,
         dtype=args.dtype,
         trust_remote_code=bool(args.trust_remote_code),
@@ -386,6 +534,7 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
         load_in_4bit=bool(args.load_in_4bit),
         load_in_8bit=bool(args.load_in_8bit),
         custom_generate=bool(args.custom_generate),
+        stable_analysis=bool(args.stable_analysis),
     )
 
     base_groups = _collect_generation_prompt_groups(
@@ -407,6 +556,9 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         max_new_tokens=int(args.max_new_tokens),
+        do_sample=bool(args.do_sample),
+        temperature=float(args.temperature),
+        seed=args.seed,
     )
     comparison_groups = _collect_generation_prompt_groups(
         comparison_wrapper,
@@ -427,6 +579,9 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         max_new_tokens=int(args.max_new_tokens),
+        do_sample=bool(args.do_sample),
+        temperature=float(args.temperature),
+        seed=args.seed,
     )
 
     return _build_generation_payload(
@@ -441,8 +596,50 @@ def _compute_live_generation_payload(args: argparse.Namespace) -> dict[str, Any]
     )
 
 
+def _saved_mode_uses_live_generation_inputs(args: argparse.Namespace) -> bool:
+    return any(
+        value is not None
+        for value in (
+            args.model_name,
+            args.comparison_model_name,
+            args.comparison_adapter_path,
+            args.tokenizer_name,
+            args.adapter_path,
+            args.prompt,
+            args.dataset_path,
+            args.system_prompt,
+            args.comparison_system_prompt,
+            args.max_length,
+            args.device_map,
+            args.seed,
+        )
+    ) or args.prompt_format != "plain" or (args.comparison_prompt_format is not None) or args.padding != "auto" or any(
+        bool(value)
+        for value in (
+            args.trust_remote_code,
+            args.load_in_4bit,
+            args.load_in_8bit,
+            args.use_chat_template,
+            args.comparison_use_chat_template,
+            args.no_add_special_tokens,
+            args.analyze_special_tokens,
+            args.truncate,
+            args.collect_components,
+            args.project_component_logits,
+            args.custom_generate,
+            not args.stable_analysis,
+        )
+    ) or int(args.max_new_tokens) != 10 or bool(args.do_sample) is not True or float(args.temperature) != 1.0 or int(args.batch_size) != 10
+
+
 def main(argv: list[str] | None = None) -> None:
+    from logit_diff_lens.plotting.logitdiff_generation_plotter import (
+        save_generation_logitdiff_heatmap,
+    )
+
     args = build_arg_parser().parse_args(argv)
+    if args.input_path is not None and _saved_mode_uses_live_generation_inputs(args):
+        raise ValueError("Saved generation heatmap mode cannot be mixed with live generation collection arguments.")
     output_format = args.format
     if output_format is None:
         suffix = str(args.output_path).lower()
@@ -459,13 +656,15 @@ def main(argv: list[str] | None = None) -> None:
     analysis_topk = args.analysis_topk if args.analysis_topk is not None else args.top_k
     payload_or_path: dict[str, Any] | str = args.input_path if args.input_path is not None else _compute_live_generation_payload(args)
 
+    include_prompt_tokens = not bool(args.exclude_prompt_tokens)
+    if args.plot_kind == "jaccard" and not args.exclude_prompt_tokens:
+        include_prompt_tokens = False
+
     common_kwargs = {
-        "prompt_index": args.prompt_index,
-        "prompt_text": args.prompt_text,
         "display_top_tokens": token_limit,
         "visible_cell_tokens": args.visible_cell_tokens,
         "max_token_chars": args.max_token_chars,
-        "include_prompt_tokens": not bool(args.exclude_prompt_tokens),
+        "include_prompt_tokens": include_prompt_tokens,
         "include_generated_tokens": not bool(args.exclude_generated_tokens),
         "start_idx": args.start_position,
         "end_idx": args.end_position,
@@ -486,10 +685,15 @@ def main(argv: list[str] | None = None) -> None:
                 else args.x_tick_mode_secondary,
             }
         )
-        if output_format == "pdf":
-            save_logitdiff_heatmap_pdf(payload_or_path, args.output_path, **common_kwargs)
-            return
-        save_logitdiff_heatmap_html(payload_or_path, args.output_path, **common_kwargs)
+        save_generation_logitdiff_heatmap(
+            payload_or_path,
+            args.output_path,
+            plot_kind="jaccard",
+            format=output_format,
+            prompt_index=args.prompt_index,
+            prompt_text=args.prompt_text,
+            **common_kwargs,
+        )
         return
 
     common_kwargs.update(
@@ -498,10 +702,15 @@ def main(argv: list[str] | None = None) -> None:
             "keep_last_layer_fraction": args.keep_last_layer_fraction,
         }
     )
-    if output_format == "pdf":
-        save_logitdiff_next_token_verification_pdf(payload_or_path, args.output_path, **common_kwargs)
-        return
-    save_logitdiff_next_token_verification_html(payload_or_path, args.output_path, **common_kwargs)
+    save_generation_logitdiff_heatmap(
+        payload_or_path,
+        args.output_path,
+        plot_kind="next_token_verification",
+        format=output_format,
+        prompt_index=args.prompt_index,
+        prompt_text=args.prompt_text,
+        **common_kwargs,
+    )
 
 
 if __name__ == "__main__":

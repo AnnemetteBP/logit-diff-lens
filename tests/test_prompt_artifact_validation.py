@@ -20,6 +20,7 @@ from logit_diff_lens.plotting import plot_comparison_metric_heatmap
 from logit_diff_lens.schemas import BackendMetadata, PromptDecodeArtifact, PromptLayerRecord
 from logit_diff_lens.validation import validate_prompt_decode_artifact
 from logit_diff_lens.wrappers.lens_wrappers.base_lens_wrapper import BaseLensWrapper
+from logit_diff_lens.wrappers.wrapper_utils import normalize_activations
 
 
 class _DummyEmbedding(torch.nn.Module):
@@ -121,8 +122,17 @@ class _DummyPromptWrapper(BaseLensWrapper):
     def release_hooks(self) -> None:
         return None
 
-    def tokenize_inputs(self, texts, device=None, add_special_tokens=True):
-        del texts, add_special_tokens
+    def tokenize_inputs(
+        self,
+        texts,
+        device=None,
+        add_special_tokens=True,
+        truncation=False,
+        max_length=None,
+        padding=None,
+        **kwargs,
+    ):
+        del texts, add_special_tokens, truncation, max_length, padding, kwargs
         target_device = device or self.model_device
         return {
             "input_ids": torch.tensor([[1, 2, 3]], dtype=torch.long, device=target_device),
@@ -142,6 +152,29 @@ class _DummyPromptWrapper(BaseLensWrapper):
             }
         )
         return acts, self.model(input_ids=input_ids, return_dict=True)
+
+
+class _DummyTunedUnembed(torch.nn.Module):
+    def forward(self, hidden: torch.Tensor) -> torch.Tensor:
+        return hidden.new_full((hidden.shape[0], hidden.shape[1], 7), 99.0)
+
+
+class _DummyTunedLens(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layer_translators = torch.nn.ModuleList(
+            [torch.nn.Linear(4, 4, bias=False), torch.nn.Linear(4, 4, bias=False)]
+        )
+        self.unembed = _DummyTunedUnembed()
+
+    def __len__(self) -> int:
+        return len(self.layer_translators)
+
+    def __getitem__(self, item: int):
+        return self.layer_translators[item]
+
+    def forward(self, hidden: torch.Tensor, idx: int) -> torch.Tensor:
+        return hidden.new_full((hidden.shape[0], hidden.shape[1], 7), float(idx + 1))
 
 
 def _backend_metadata() -> BackendMetadata:
@@ -170,7 +203,108 @@ def test_collect_prompt_lens_activations_returns_valid_artifact() -> None:
     assert artifact.backend_metadata.activation_backend == "wrapper"
     assert artifact.token_text == ["tok1", "tok2", "tok3"]
     assert [record.layer_index for record in artifact.layer_records] == [-1, 0, 1, 2]
+    assert artifact.batch_semantics == "single_sequence_per_record"
+    assert artifact.record_semantics == "one_record_per_layer"
     validate_prompt_decode_artifact(artifact)
+
+
+def test_collect_prompt_lens_activations_can_normalize_embedding_for_model_norm() -> None:
+    wrapper = _DummyPromptWrapper()
+    result = collect_prompt_lens_activations(
+        wrapper,
+        PromptLensActivationCollectorConfig(
+            prompt="demo",
+            force_include_output=True,
+            normalize_embedding_for_readout=True,
+        ),
+    )
+
+    artifact = result["artifact"]
+    embedding_record = artifact.layer_records[0]
+    assert embedding_record.layer_name == "embedding"
+    assert embedding_record.logits_model_norm is not None
+    assert embedding_record.logits_raw is not None
+    assert not torch.allclose(embedding_record.logits_model_norm, embedding_record.logits_raw)
+
+
+def test_collect_prompt_lens_activations_can_attach_tuned_logits(monkeypatch) -> None:
+    wrapper = _DummyPromptWrapper()
+    monkeypatch.setattr(
+        "logit_diff_lens.collectors.prompt._load_tuned_lens",
+        lambda wrapper, resource_id: _DummyTunedLens(),
+    )
+
+    result = collect_prompt_lens_activations(
+        wrapper,
+        PromptLensActivationCollectorConfig(
+            prompt="demo",
+            force_include_output=True,
+            tuned_lens_resource_id="dummy/tuned",
+        ),
+    )
+
+    artifact = result["artifact"]
+    assert "tuned" in artifact.lens_modes
+    assert artifact.metadata["tuned_lens_resource_id"] == "dummy/tuned"
+    assert torch.allclose(artifact.layer_records[0].logits_tuned, torch.full((1, 3, 7), 1.0))
+    assert torch.allclose(artifact.layer_records[1].logits_tuned, torch.full((1, 3, 7), 2.0))
+    assert torch.allclose(artifact.layer_records[2].logits_tuned, torch.full((1, 3, 7), 99.0))
+    assert torch.allclose(artifact.layer_records[3].logits_tuned, torch.full((1, 3, 7), 99.0))
+    validate_prompt_decode_artifact(artifact)
+
+
+def test_normalize_activations_leaves_embedding_raw_by_default_and_can_opt_in() -> None:
+    final_norm = torch.nn.LayerNorm(4)
+    x = torch.tensor([[[1.0, 2.0, 3.0, 4.0]]], dtype=torch.float32)
+    unchanged = normalize_activations(
+        x=x.clone(),
+        mode="model_norm",
+        block="embedding",
+        layer_index=-1,
+        normalize_embedding_for_readout=False,
+        model_device=torch.device("cpu"),
+        model_dtype=torch.float32,
+        final_norm=final_norm,
+    )
+    normalized = normalize_activations(
+        x=x.clone(),
+        mode="model_norm",
+        block="embedding",
+        layer_index=-1,
+        normalize_embedding_for_readout=True,
+        model_device=torch.device("cpu"),
+        model_dtype=torch.float32,
+        final_norm=final_norm,
+    )
+    assert torch.allclose(unchanged, x)
+    assert not torch.allclose(normalized, x)
+
+
+def test_prompt_layer_record_mode_accessors_work() -> None:
+    record = PromptLayerRecord(
+        layer_index=0,
+        layer_name="layer_0",
+        tokens=torch.tensor([[1, 2]], dtype=torch.long),
+        token_text=["tok1", "tok2"],
+        attention_mask=torch.tensor([[1, 1]], dtype=torch.long),
+        hidden=torch.ones((1, 2, 3), dtype=torch.float32),
+        logits_raw=torch.zeros((1, 2, 5), dtype=torch.float32),
+        logits_tuned=torch.full((1, 2, 5), 4.0, dtype=torch.float32),
+        attention_output=torch.full((1, 2, 3), 2.0, dtype=torch.float32),
+        attention_logits_raw=torch.full((1, 2, 5), 3.0, dtype=torch.float32),
+    )
+
+    assert torch.equal(record.get_hidden("raw"), record.hidden)
+    assert torch.equal(record.get_hidden("model_norm"), record.hidden)
+    assert torch.equal(record.hidden_raw, record.hidden)
+    assert torch.equal(record.hidden_model_norm, record.hidden)
+    assert torch.equal(record.get_logits("raw"), torch.zeros((1, 2, 5), dtype=torch.float32))
+    assert torch.equal(record.get_logits("tuned"), torch.full((1, 2, 5), 4.0, dtype=torch.float32))
+    assert torch.equal(record.get_component_output("attention"), torch.full((1, 2, 3), 2.0, dtype=torch.float32))
+    assert torch.equal(
+        record.get_component_logits("attention", "raw"),
+        torch.full((1, 2, 5), 3.0, dtype=torch.float32),
+    )
 
 
 def test_validate_prompt_decode_artifact_rejects_nonfinite_hidden() -> None:
@@ -284,6 +418,44 @@ def test_collect_prompt_activation_dataset_incremental_saves_artifacts(tmp_path)
     assert len(saved["artifacts"]) == 1
 
 
+def test_prompt_capture_dataset_bundle_metadata_is_capture_complete(tmp_path) -> None:
+    dataset_path = tmp_path / "dataset.jsonl"
+    output_path = tmp_path / "output_bundle.pt"
+    partial_path = tmp_path / "partial_bundle.pt"
+    dataset_path.write_text(
+        '{"id": 1, "group_id": "g1", "variant": "prompt", "language": "en", "prompt": "demo", "analysis_text": "demo", "label": 0}\n',
+        encoding="utf-8",
+    )
+
+    wrapper = _DummyPromptWrapper()
+    payload = collect_prompt_activation_dataset_incremental(
+        wrapper=wrapper,
+        dataset_path=dataset_path,
+        output_path=output_path,
+        partial_path=partial_path,
+        text_field="analysis_text",
+        label_field="label",
+        model_key="base",
+        use_chat_template=False,
+        prompt_format="plain",
+        system_prompt=None,
+        add_special_tokens=True,
+        truncation=False,
+        max_length=None,
+        padding="longest",
+        force_include_input=True,
+        force_include_output=True,
+        norm_modes=("raw", "model_norm"),
+        collect_components=False,
+        project_component_logits=False,
+        save_logits=True,
+    )
+
+    assert payload["artifacts"][0]["metadata"]["force_include_input"] is True
+    assert payload["artifacts"][0]["metadata"]["force_include_output"] is True
+    assert payload["artifacts"][0]["metadata"]["padding"] == "longest"
+
+
 def test_compare_prompt_artifacts_ft_minus_base_uses_canonical_order() -> None:
     wrapper = _DummyPromptWrapper()
     base_artifact = collect_prompt_lens_activations(
@@ -316,6 +488,36 @@ def test_compare_prompt_artifacts_ft_minus_base_uses_canonical_order() -> None:
     assert torch.allclose(
         first_layer["logits_ft_minus_base"],
         torch.full_like(first_layer["logits_ft_minus_base"], 0.5),
+    )
+
+
+def test_compare_prompt_artifacts_ft_minus_base_supports_tuned_readout() -> None:
+    wrapper = _DummyPromptWrapper()
+    base_artifact = collect_prompt_lens_activations(
+        wrapper,
+        PromptLensActivationCollectorConfig(prompt="demo", force_include_output=True),
+    )["artifact"]
+    ft_artifact = PromptDecodeArtifact.from_dict(base_artifact.to_dict())
+
+    for record in base_artifact.layer_records:
+        record.logits_tuned = torch.full((1, 3, 7), 1.0, dtype=torch.float32)
+    for record in ft_artifact.layer_records:
+        record.logits_tuned = torch.full((1, 3, 7), 1.75, dtype=torch.float32)
+    base_artifact.lens_modes.append("tuned")
+    ft_artifact.lens_modes.append("tuned")
+
+    comparison = compare_prompt_artifacts_ft_minus_base(
+        ft_artifact,
+        base_artifact,
+        readout_mode="tuned",
+        topk=3,
+        reference_token_ids=torch.tensor([[1, 2, 3]], dtype=torch.long),
+    )
+
+    first_layer = comparison["layer_results"][0]
+    assert torch.allclose(
+        first_layer["logits_ft_minus_base"],
+        torch.full_like(first_layer["logits_ft_minus_base"], 0.75),
     )
     assert "jsd_ft_base" in first_layer["metrics"]
     assert "topk_jaccard_ft_base" in first_layer["metrics"]

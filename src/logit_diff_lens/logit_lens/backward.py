@@ -4,6 +4,7 @@ import argparse
 
 from ..collectors.backward import BackwardLensCollectorConfig, collect_backward_prompt_artifact
 from ..diffing.io import save_backward_prompt_artifact
+from .runtime_args import add_stable_analysis_args
 from ..wrappers import LogitLensWrapper
 from .capture import _load_model_and_tokenizer
 
@@ -36,6 +37,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-collect-attention-vjp", dest="collect_attention_vjp", action="store_false")
     parser.add_argument("--no-collect-mlp-vjp", dest="collect_mlp_vjp", action="store_false")
     parser.add_argument("--debug", action="store_true")
+    add_stable_analysis_args(parser)
     return parser
 
 
@@ -60,7 +62,7 @@ def main(argv: list[str] | None = None) -> None:
         include_final_norm=True,
         fp32_save=True,
         debug=bool(args.debug),
-        stable_analysis=True,
+        stable_analysis=bool(args.stable_analysis),
     )
     target_position = args.target_position
     if target_position != "last":

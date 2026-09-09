@@ -13,6 +13,7 @@ from logit_diff_lens.collectors.generation import (
     collect_generation_activations,
 )
 from logit_diff_lens.logit_lens.capture import _resolve_torch_dtype
+from logit_diff_lens.logit_lens.runtime_args import add_generation_runtime_args, add_stable_analysis_args
 from logit_diff_lens.wrappers import CustomGenerationLensWrapper, GenerateLensWrapper
 
 
@@ -37,7 +38,7 @@ def _load_model_and_tokenizer(
     model_kwargs: dict[str, Any] = {"trust_remote_code": trust_remote_code}
     torch_dtype = _resolve_torch_dtype(precision)
     if torch_dtype != "auto":
-        model_kwargs["torch_dtype"] = torch_dtype
+        model_kwargs["dtype"] = torch_dtype
     if device_map:
         model_kwargs["device_map"] = device_map
     if load_in_4bit:
@@ -91,16 +92,17 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-force-include-input", dest="force_include_input", action="store_false")
     parser.add_argument("--force-include-output", action="store_true", default=True)
     parser.add_argument("--no-force-include-output", dest="force_include_output", action="store_false")
+    parser.add_argument("--normalize-embedding-for-readout", action="store_true")
     parser.add_argument(
         "--norm-modes",
         nargs="+",
         default=("raw", "unit_norm", "eps_norm", "model_norm"),
     )
-    parser.add_argument("--max-new-tokens", type=int, default=10)
-    parser.add_argument("--batch-size", type=int, default=10)
+    add_generation_runtime_args(parser, include_batch_size=True)
     parser.add_argument("--collect-components", action="store_true")
     parser.add_argument("--project-component-logits", action="store_true")
     parser.add_argument("--custom-generate", action="store_true")
+    add_stable_analysis_args(parser)
     return parser
 
 
@@ -136,7 +138,7 @@ def main(argv: list[str] | None = None) -> None:
         include_final_norm=True,
         fp32_save=True,
         debug=False,
-        stable_analysis=True,
+        stable_analysis=bool(args.stable_analysis),
     )
 
     output_path = Path(args.output_path)
@@ -157,10 +159,14 @@ def main(argv: list[str] | None = None) -> None:
                 padding=_resolve_padding(args.padding),
                 force_include_input=bool(args.force_include_input),
                 force_include_output=bool(args.force_include_output),
+                normalize_embedding_for_readout=bool(args.normalize_embedding_for_readout),
                 norm_modes=tuple(args.norm_modes),
                 collect_components=bool(args.collect_components),
                 project_component_logits=bool(args.project_component_logits),
                 max_new_tokens=int(args.max_new_tokens),
+                do_sample=bool(args.do_sample),
+                temperature=float(args.temperature),
+                seed=args.seed,
             ),
         )
         torch.save(payload, output_path)
@@ -182,10 +188,14 @@ def main(argv: list[str] | None = None) -> None:
         padding=_resolve_padding(args.padding),
         force_include_input=bool(args.force_include_input),
         force_include_output=bool(args.force_include_output),
+        normalize_embedding_for_readout=bool(args.normalize_embedding_for_readout),
         norm_modes=tuple(args.norm_modes),
         collect_components=bool(args.collect_components),
         project_component_logits=bool(args.project_component_logits),
         max_new_tokens=int(args.max_new_tokens),
+        do_sample=bool(args.do_sample),
+        temperature=float(args.temperature),
+        seed=args.seed,
         batch_size=int(args.batch_size),
     )
     torch.save(payload, output_path)

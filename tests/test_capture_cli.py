@@ -21,6 +21,22 @@ def test_capture_cli_parser_accepts_prompt_mode() -> None:
     assert args.dataset_path is None
 
 
+def test_capture_cli_parser_accepts_embedding_normalization_toggle() -> None:
+    parser = build_arg_parser()
+    args = parser.parse_args(
+        [
+            "--model-name",
+            "EleutherAI/pythia-70m-deduped",
+            "--prompt",
+            "Demo prompt",
+            "--output-path",
+            "tmp/demo_artifact.pt",
+            "--normalize-embedding-for-readout",
+        ]
+    )
+    assert args.normalize_embedding_for_readout is True
+
+
 def test_capture_cli_requires_exactly_one_input_mode() -> None:
     with pytest.raises(ValueError, match="Provide exactly one of --prompt or --dataset-path."):
         main(

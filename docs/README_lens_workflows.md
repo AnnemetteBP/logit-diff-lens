@@ -22,6 +22,10 @@ Use the prompt lens when you want to compare:
 - prompt-side datasets and reusable capture artifacts
 - `raw` vs `model_norm` prompt decoding
 
+Prompt lens can still use prompt formatting such as `plain`, `chat_template`, or `user_assistant_prefix`. In that case the template is only used to format the prompt before the forward pass; it is not a generation-only feature.
+
+For ordinary single-prompt prompt-lens runs, padding is usually not a meaningful user-facing control. The prompt-side collector already trims to the effective attention-mask span, so explicit padding is mostly an optional tokenizer override for dataset or batch-oriented capture.
+
 Single prompt capture:
 
 ```bash
@@ -35,7 +39,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --system-prompt "<system-prompt>" \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm \
@@ -72,6 +75,7 @@ PYTHONPATH=src python pipelines/compare_prompt_artifacts.py \
 ```
 
 Prompt-side heatmaps can run either from a saved payload or as a live compute-and-plot workflow through `pipelines/plot_prompt_heatmap.py`, including `force_include_input`, `force_include_output`, tokenization controls, prompt-vs-dataset inputs, and the same plotting controls used on the generation side.
+For ordinary single-prompt prompt-side live plotting, explicit padding is usually unnecessary for the same reason as prompt capture: the collector trims to the effective attention-mask span.
 
 ## Generation lens
 
@@ -129,19 +133,24 @@ Both prompt and generation workflows surface:
 - `--use-chat-template`
 - `--prompt-format`
 - `--system-prompt`
+- `--no-add-special-tokens`
 - `--truncate`
 - `--max-length`
-- `--padding`
 - `--force-include-input`
 - `--force-include-output`
 - `--norm-modes`
+- `--stable-analysis`
 
 Generation-side direct capture exposes:
 
+- `--padding`
 - `--max-new-tokens`
 - `--batch-size`
 - `--no-add-special-tokens`
 - `--analyze-special-tokens`
+- `--do-sample`
+- `--temperature`
+- `--seed`
 - `--custom-generate`
 
 ## Generation config controls

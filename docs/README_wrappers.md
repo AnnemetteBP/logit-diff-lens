@@ -87,7 +87,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --system-prompt "<system-prompt>" \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm \
@@ -106,7 +105,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --prompt-format plain \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --norm-modes raw model_norm
 ```
@@ -123,11 +121,17 @@ Important prompt-side controls already exposed in code:
 - `--prompt-format`
 - `--system-prompt`
 - `--no-add-special-tokens`
+- `--truncate`
+- `--max-length`
+- `--padding`
 - `--force-include-input`
 - `--force-include-output`
+- `--norm-modes`
 - `--collect-components`
 - `--project-component-logits`
 - `--save-logits`
+- `--stable-analysis`
+- `--debug`
 
 ## Generation-side surface
 
@@ -185,6 +189,9 @@ The generation collectors in the repo also support:
 - dataset-driven runs
 - `batch_size`
 - `max_new_tokens`
+- `do_sample`
+- `temperature`
+- `seed`
 - `truncate`
 - `max_length`
 - padding control
@@ -212,9 +219,9 @@ Prompt-side code trims to the effective attention-mask span so padding-only toke
 Public wrapper-facing capture parameters now exposed in the main toolkit include:
 
 - prompt-side:
-  `--prompt`, `--dataset-path`, `--text-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`
+  `--prompt`, `--dataset-path`, `--text-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`, `--save-logits`, `--stable-analysis`, `--debug`
 - generation-side:
-  `--prompt`, `--dataset-path`, `--text-field`, `--label-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--no-add-special-tokens`, `--analyze-special-tokens`, `--max-new-tokens`, `--batch-size`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`, `--custom-generate`
+  `--prompt`, `--dataset-path`, `--text-field`, `--label-field`, `--use-chat-template`, `--prompt-format`, `--system-prompt`, `--truncate`, `--max-length`, `--padding`, `--no-add-special-tokens`, `--analyze-special-tokens`, `--max-new-tokens`, `--batch-size`, `--do-sample`, `--temperature`, `--seed`, `--force-include-input`, `--force-include-output`, `--norm-modes`, `--collect-components`, `--project-component-logits`, `--custom-generate`, `--stable-analysis`
 
 ## How to interpret the result
 

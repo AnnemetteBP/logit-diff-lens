@@ -13,12 +13,14 @@ These guides cover the public `LogitDiff` toolkit surface for prompt capture, ge
 - [Lens Workflows](README_lens_workflows.md)
   Shared guide for the prompt-lens and generation-lens modes inside the main LogitDiff toolkit.
 - [Heatmaps](README_heatmaps.md)
-  Prompt, generation, LDL, ADL, single-model, and paired-condition heatmap families.
+  Prompt LogitDiff, generation LogitDiff, single-model, and ADL heatmaps.
 
 ## Analysis Guides
 
 - [Comparison Artifacts](README_comparison_artifacts.md)
   Canonical prompt-side comparison artifacts and comparison-metric plotting.
+- [Null-Calibrated Similarity](README_similarity.md)
+  Robust alignment analysis for saved prompt and generation artifacts.
 - [Patchscopes](README_patchscopes.md)
   Prompt and generation intervention workflows.
 - [Logit Prisms](README_logit_prisms.md)

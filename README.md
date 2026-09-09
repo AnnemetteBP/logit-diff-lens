@@ -48,6 +48,10 @@ python -m pip install -e ".[dev,local_upstreams]"
 
 ### Prompt capture
 
+Prompt lens can still use prompt formatting such as `plain`, `chat_template`, or `user_assistant_prefix`. That formatting happens before the forward pass over the prompt and is not generation-time behavior.
+
+For ordinary single-prompt prompt-lens runs, padding is usually not something you need to pass explicitly. The prompt-side collector already trims to the effective attention-mask span, so padding is mainly an optional tokenizer override for dataset or batch-oriented capture.
+
 Single prompt:
 
 ```bash
@@ -61,7 +65,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --system-prompt "<system-prompt>" \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm \
@@ -103,7 +106,9 @@ Prompt heatmaps and generation heatmaps share the same overall workflow surface:
 - or compute live and plot from the same command
 - keep capture or generation controls on the same surface as the plotting controls
 
-Common plotting controls include `--plot-kind`, `--prompt-index`, `--top-k`, `--display-top-tokens`, `--visible-cell-tokens`, `--start-position`, `--end-position`, `--max-layers`, `--max-divergent-layers`, `--layer-selection`, `--keep-last-layer-fraction`, `--title`, `--colorscale`, and `--show-marginals`.
+Common plotting controls include `--plot-kind`, `--prompt-index`, `--top-k`, `--analysis-topk`, `--display-top-tokens`, `--visible-cell-tokens`, `--start-position`, `--end-position`, `--max-layers`, `--max-divergent-layers`, `--layer-selection`, `--keep-last-layer-fraction`, `--x-tick-mode`, `--x-tick-mode-secondary`, `--title`, `--colorscale`, and `--show-marginals`.
+
+Live plotting also exposes the relevant upstream capture controls. Prompt-side live plotting includes the prompt-formatting and comparison-formatting flags, readout choice, component/logit capture toggles, and `stable_analysis`. Generation-side live plotting additionally exposes generation controls such as `padding`, `max_new_tokens`, `do_sample`, `temperature`, `seed`, `comparison_top_ks`, and `custom_generate`.
 
 Prompt saved-payload mode:
 
@@ -143,7 +148,6 @@ PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
   --visible-cell-tokens 10 \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --start-position 0 \
   --end-position 64 \
   --max-layers 6 \
@@ -213,6 +217,31 @@ PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
   --max-new-tokens 32 \
   --batch-size 8 \
   --norm-modes raw unit_norm eps_norm model_norm
+```
+
+Single-model and ADL follow-up heatmaps:
+
+```bash
+PYTHONPATH=src python pipelines/plot_single_model_heatmap.py \
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<single-model-heatmap>.pdf \
+  --metric entropy \
+  --norm-mode model_norm \
+  --force-include-input \
+  --force-include-output
+```
+
+```bash
+PYTHONPATH=src python pipelines/plot_adl_heatmap.py \
+  --model-name <base-model-name> \
+  --comparison-model-name <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<adl-heatmap>.pdf \
+  --metric kl_div \
+  --norm-mode model_norm \
+  --force-include-input \
+  --force-include-output
 ```
 
 ### Generation lens
@@ -302,7 +331,10 @@ PYTHONPATH=src python pipelines/run_patchscope_generation.py \
   --base-model-id <base-model-name> \
   --comparison-model-id <comparison-model-name> \
   --prompt "<prompt-text>" \
-  --output-path tmp/artifacts/<generation-patchscope-run>.json
+  --output-path tmp/artifacts/<generation-patchscope-run>.json \
+  --use-chat-template \
+  --chat-template-path <template-file.jinja> \
+  --system-prompt "<system-prompt>"
 ```
 
 ## Wrappers, masks, and readouts
@@ -346,6 +378,7 @@ External tuned-lens comparisons are handled as a separate learned readout workfl
 - [docs/README_lens_workflows.md](docs/README_lens_workflows.md)
 - [docs/README_heatmaps.md](docs/README_heatmaps.md)
 - [docs/README_comparison_artifacts.md](docs/README_comparison_artifacts.md)
+- [docs/README_similarity.md](docs/README_similarity.md)
 - [docs/README_patchscopes.md](docs/README_patchscopes.md)
 - [docs/README_logit_prisms.md](docs/README_logit_prisms.md)
 - [docs/README_backward_artifacts.md](docs/README_backward_artifacts.md)

@@ -4,6 +4,7 @@ import argparse
 
 from ..collectors.patchscope import PatchscopePromptConfig, collect_patchscope_prompt_artifact
 from ..diffing.io import load_prompt_decode_artifact, save_patchscope_prompt_artifact
+from .runtime_args import add_stable_analysis_args
 from ..wrappers import PatchingLensWrapper
 from .capture import _load_model_and_tokenizer
 
@@ -30,6 +31,7 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument("--load-in-4bit", action="store_true")
     parser.add_argument("--load-in-8bit", action="store_true")
     parser.add_argument("--debug", action="store_true")
+    add_stable_analysis_args(parser)
     return parser
 
 
@@ -52,7 +54,7 @@ def main(argv: list[str] | None = None) -> None:
         include_final_norm=True,
         fp32_save=True,
         debug=bool(args.debug),
-        stable_analysis=True,
+        stable_analysis=bool(args.stable_analysis),
     )
     artifact = collect_patchscope_prompt_artifact(
         wrapper,

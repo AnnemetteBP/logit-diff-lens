@@ -5,8 +5,8 @@ from typing import Any
 
 import torch
 
+from ..pair_validation import validate_prompt_artifact_pair
 from ..schemas import PromptDecodeArtifact, PromptLayerRecord
-from ..validation import validate_prompt_decode_artifact
 from .distribution_metrics import jaccard_topk, js_divergence, kl_divergence
 from .hidden_metrics import cosine_distance, l2_distance, normalized_l2_distance
 
@@ -44,12 +44,9 @@ def _get_layer_record_by_index(artifact: PromptDecodeArtifact, layer_index: int)
 
 
 def _get_logits_for_mode(record: PromptLayerRecord, mode: ReadoutMode) -> torch.Tensor:
-    if mode == "raw":
-        logits = record.logits_raw
-    elif mode == "model_norm":
-        logits = record.logits_model_norm
-    else:
+    if mode not in {"raw", "model_norm", "tuned"}:
         raise ValueError(f"Unsupported readout mode: {mode}")
+    logits = record.get_logits(mode)
     if logits is None:
         raise ValueError(f"Layer {record.layer_name} is missing logits for mode={mode}")
     return logits
@@ -75,13 +72,14 @@ def compare_prompt_artifacts_ft_minus_base(
     topk: int = 10,
     reference_token_ids: torch.Tensor | None = None,
 ) -> dict[str, Any]:
-    validate_prompt_decode_artifact(ft_artifact)
-    validate_prompt_decode_artifact(base_artifact)
-
-    if not torch.equal(ft_artifact.token_ids, base_artifact.token_ids):
-        raise ValueError("ft and base artifacts must have identical token_ids for prompt comparison")
-    if len(ft_artifact.layer_records) != len(base_artifact.layer_records):
-        raise ValueError("ft and base artifacts must have identical layer counts for prompt comparison")
+    validate_prompt_artifact_pair(
+        ft_artifact,
+        base_artifact,
+        alignment_mode="same_token_ids",
+        side_a_label="comparison",
+        side_b_label="base",
+        readout_mode=readout_mode,
+    )
 
     layer_results: list[LayerComparisonResult] = []
     for ft_record in ft_artifact.layer_records:
@@ -91,8 +89,8 @@ def compare_prompt_artifacts_ft_minus_base(
                 f"Layer name mismatch at index {ft_record.layer_index}: {ft_record.layer_name} != {base_record.layer_name}"
             )
 
-        hidden_ft = ft_record.hidden.to(dtype=torch.float32)
-        hidden_base = base_record.hidden.to(dtype=torch.float32)
+        hidden_ft = ft_record.get_hidden("raw").to(dtype=torch.float32)
+        hidden_base = base_record.get_hidden("raw").to(dtype=torch.float32)
         logits_ft = _get_logits_for_mode(ft_record, readout_mode).to(dtype=torch.float32)
         logits_base = _get_logits_for_mode(base_record, readout_mode).to(dtype=torch.float32)
         probs_ft = torch.softmax(logits_ft, dim=-1)

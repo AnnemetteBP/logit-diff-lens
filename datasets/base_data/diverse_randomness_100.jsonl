@@ -1,0 +1,109 @@
+{"id": 1, "group_id": "diverse_randomness_001", "variant": "prompt_only", "category": "factual_qa", "text": "What causes ocean tides on Earth?", "label": 0}
+{"id": 2, "group_id": "diverse_randomness_002", "variant": "prompt_only", "category": "factual_qa", "text": "Who wrote the novel Pride and Prejudice?", "label": 0}
+{"id": 3, "group_id": "diverse_randomness_003", "variant": "prompt_only", "category": "factual_qa", "text": "What is the capital city of Brazil?", "label": 0}
+{"id": 4, "group_id": "diverse_randomness_004", "variant": "prompt_only", "category": "factual_qa", "text": "Which gas do plants absorb during photosynthesis?", "label": 0}
+{"id": 5, "group_id": "diverse_randomness_005", "variant": "prompt_only", "category": "factual_qa", "text": "What year did the Berlin Wall fall?", "label": 0}
+{"id": 6, "group_id": "diverse_randomness_006", "variant": "prompt_only", "category": "factual_qa", "text": "What is the largest planet in the Solar System?", "label": 0}
+{"id": 7, "group_id": "diverse_randomness_007", "variant": "prompt_only", "category": "factual_qa", "text": "What is the chemical symbol for gold?", "label": 0}
+{"id": 8, "group_id": "diverse_randomness_008", "variant": "prompt_only", "category": "factual_qa", "text": "Which organ pumps blood through the human body?", "label": 0}
+{"id": 9, "group_id": "diverse_randomness_009", "variant": "prompt_only", "category": "factual_qa", "text": "Who painted The Starry Night?", "label": 0}
+{"id": 10, "group_id": "diverse_randomness_010", "variant": "prompt_only", "category": "factual_qa", "text": "What is the boiling point of water at sea level in Celsius?", "label": 0}
+{"id": 11, "group_id": "diverse_randomness_011", "variant": "prompt_only", "category": "factual_qa", "text": "What is the tallest mountain above sea level?", "label": 0}
+{"id": 12, "group_id": "diverse_randomness_012", "variant": "prompt_only", "category": "factual_qa", "text": "Which country is home to the Great Pyramid of Giza?", "label": 0}
+
+{"id": 13, "group_id": "diverse_randomness_013", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "If you leave ice cream in the sun, what will probably happen?", "label": 0}
+{"id": 14, "group_id": "diverse_randomness_014", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "Why might someone bring an umbrella even if the morning sky is clear?", "label": 0}
+{"id": 15, "group_id": "diverse_randomness_015", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "A glass falls off a table. What is the most likely result?", "label": 0}
+{"id": 16, "group_id": "diverse_randomness_016", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "Why do people usually refrigerate milk?", "label": 0}
+{"id": 17, "group_id": "diverse_randomness_017", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "If a phone battery is at 1 percent, what should you do next?", "label": 0}
+{"id": 18, "group_id": "diverse_randomness_018", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "Why might a person wear a coat in winter?", "label": 0}
+{"id": 19, "group_id": "diverse_randomness_019", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "If traffic is heavy, what may happen to your travel time?", "label": 0}
+{"id": 20, "group_id": "diverse_randomness_020", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "Why would someone double-check that they locked the door?", "label": 0}
+{"id": 21, "group_id": "diverse_randomness_021", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "If you water a plant regularly, what might improve?", "label": 0}
+{"id": 22, "group_id": "diverse_randomness_022", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "Why might a child cry after dropping a toy into a puddle?", "label": 0}
+{"id": 23, "group_id": "diverse_randomness_023", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "What is a likely reason someone sets an alarm before going to bed?", "label": 0}
+{"id": 24, "group_id": "diverse_randomness_024", "variant": "prompt_only", "category": "commonsense_reasoning", "text": "If a room is dark and you want to read, what should you do?", "label": 0}
+
+{"id": 25, "group_id": "diverse_randomness_025", "variant": "prompt_only", "category": "math_symbolic", "text": "What is 17 plus 26?", "label": 0}
+{"id": 26, "group_id": "diverse_randomness_026", "variant": "prompt_only", "category": "math_symbolic", "text": "What is 144 divided by 12?", "label": 0}
+{"id": 27, "group_id": "diverse_randomness_027", "variant": "prompt_only", "category": "math_symbolic", "text": "If x plus 3 equals 10, what is x?", "label": 0}
+{"id": 28, "group_id": "diverse_randomness_028", "variant": "prompt_only", "category": "math_symbolic", "text": "What is the next number in the sequence 2, 4, 8, 16, ?", "label": 0}
+{"id": 29, "group_id": "diverse_randomness_029", "variant": "prompt_only", "category": "math_symbolic", "text": "A rectangle has width 4 and height 9. What is its area?", "label": 0}
+{"id": 30, "group_id": "diverse_randomness_030", "variant": "prompt_only", "category": "math_symbolic", "text": "What is 15 percent of 200?", "label": 0}
+{"id": 31, "group_id": "diverse_randomness_031", "variant": "prompt_only", "category": "math_symbolic", "text": "If a train travels 60 kilometers in 45 minutes, what is its average speed in kilometers per hour?", "label": 0}
+{"id": 32, "group_id": "diverse_randomness_032", "variant": "prompt_only", "category": "math_symbolic", "text": "What is the derivative of x squared?", "label": 0}
+{"id": 33, "group_id": "diverse_randomness_033", "variant": "prompt_only", "category": "math_symbolic", "text": "What is the value of 3 factorial?", "label": 0}
+{"id": 34, "group_id": "diverse_randomness_034", "variant": "prompt_only", "category": "math_symbolic", "text": "If you flip a fair coin once, what is the probability of heads?", "label": 0}
+{"id": 35, "group_id": "diverse_randomness_035", "variant": "prompt_only", "category": "math_symbolic", "text": "Solve for y: 2y minus 8 equals 0.", "label": 0}
+{"id": 36, "group_id": "diverse_randomness_036", "variant": "prompt_only", "category": "math_symbolic", "text": "What is the square root of 81?", "label": 0}
+
+{"id": 37, "group_id": "diverse_randomness_037", "variant": "prompt_only", "category": "code_debugging", "text": "Write a Python function that returns the largest number in a list.", "label": 0}
+{"id": 38, "group_id": "diverse_randomness_038", "variant": "prompt_only", "category": "code_debugging", "text": "Explain what this Python line does: nums[::-1]", "label": 0}
+{"id": 39, "group_id": "diverse_randomness_039", "variant": "prompt_only", "category": "code_debugging", "text": "How would you fix an off-by-one error in a for loop?", "label": 0}
+{"id": 40, "group_id": "diverse_randomness_040", "variant": "prompt_only", "category": "code_debugging", "text": "Write SQL to count the number of rows in a table named users.", "label": 0}
+{"id": 41, "group_id": "diverse_randomness_041", "variant": "prompt_only", "category": "code_debugging", "text": "What is the difference between a list and a tuple in Python?", "label": 0}
+{"id": 42, "group_id": "diverse_randomness_042", "variant": "prompt_only", "category": "code_debugging", "text": "Give pseudocode for binary search.", "label": 0}
+{"id": 43, "group_id": "diverse_randomness_043", "variant": "prompt_only", "category": "code_debugging", "text": "Why might a program raise a null pointer exception?", "label": 0}
+{"id": 44, "group_id": "diverse_randomness_044", "variant": "prompt_only", "category": "code_debugging", "text": "Write a regular expression that matches a four-digit year.", "label": 0}
+{"id": 45, "group_id": "diverse_randomness_045", "variant": "prompt_only", "category": "code_debugging", "text": "How do you create a dictionary in Python?", "label": 0}
+{"id": 46, "group_id": "diverse_randomness_046", "variant": "prompt_only", "category": "code_debugging", "text": "What is a stack trace used for in debugging?", "label": 0}
+{"id": 47, "group_id": "diverse_randomness_047", "variant": "prompt_only", "category": "code_debugging", "text": "Write JavaScript that prints Hello, world to the console.", "label": 0}
+{"id": 48, "group_id": "diverse_randomness_048", "variant": "prompt_only", "category": "code_debugging", "text": "When would you use a hash map instead of a list?", "label": 0}
+
+{"id": 49, "group_id": "diverse_randomness_049", "variant": "prompt_only", "category": "rewrite_translation", "text": "Rewrite this more formally: I don't think that's gonna work.", "label": 0}
+{"id": 50, "group_id": "diverse_randomness_050", "variant": "prompt_only", "category": "rewrite_translation", "text": "Translate this to French: The meeting starts at noon.", "label": 0}
+{"id": 51, "group_id": "diverse_randomness_051", "variant": "prompt_only", "category": "rewrite_translation", "text": "Paraphrase this sentence without changing the meaning: The storm caused widespread delays.", "label": 0}
+{"id": 52, "group_id": "diverse_randomness_052", "variant": "prompt_only", "category": "rewrite_translation", "text": "Turn this into a polite email opener: Send me the report today.", "label": 0}
+{"id": 53, "group_id": "diverse_randomness_053", "variant": "prompt_only", "category": "rewrite_translation", "text": "Translate this to Spanish: Where is the nearest train station?", "label": 0}
+{"id": 54, "group_id": "diverse_randomness_054", "variant": "prompt_only", "category": "rewrite_translation", "text": "Simplify this sentence for a child: Photosynthesis converts light energy into chemical energy.", "label": 0}
+{"id": 55, "group_id": "diverse_randomness_055", "variant": "prompt_only", "category": "rewrite_translation", "text": "Rewrite this text in a more enthusiastic tone: The event was successful.", "label": 0}
+{"id": 56, "group_id": "diverse_randomness_056", "variant": "prompt_only", "category": "rewrite_translation", "text": "Translate this to German: I would like a cup of coffee.", "label": 0}
+{"id": 57, "group_id": "diverse_randomness_057", "variant": "prompt_only", "category": "rewrite_translation", "text": "Convert this bullet point into a full sentence: improve battery life", "label": 0}
+{"id": 58, "group_id": "diverse_randomness_058", "variant": "prompt_only", "category": "rewrite_translation", "text": "Make this sentence shorter without changing its meaning: The company announced that it would postpone the launch until next quarter.", "label": 0}
+{"id": 59, "group_id": "diverse_randomness_059", "variant": "prompt_only", "category": "rewrite_translation", "text": "Translate this to Italian: We arrived later than expected.", "label": 0}
+{"id": 60, "group_id": "diverse_randomness_060", "variant": "prompt_only", "category": "rewrite_translation", "text": "Restate this as a question: You finished the assignment.", "label": 0}
+
+{"id": 61, "group_id": "diverse_randomness_061", "variant": "prompt_only", "category": "creative_open_ended", "text": "Write a two-sentence story about a lighthouse during a storm.", "label": 0}
+{"id": 62, "group_id": "diverse_randomness_062", "variant": "prompt_only", "category": "creative_open_ended", "text": "Invent a name for a city on Mars and describe it in one sentence.", "label": 0}
+{"id": 63, "group_id": "diverse_randomness_063", "variant": "prompt_only", "category": "creative_open_ended", "text": "Give me a metaphor for learning something difficult.", "label": 0}
+{"id": 64, "group_id": "diverse_randomness_064", "variant": "prompt_only", "category": "creative_open_ended", "text": "Describe a library from the perspective of a cat.", "label": 0}
+{"id": 65, "group_id": "diverse_randomness_065", "variant": "prompt_only", "category": "creative_open_ended", "text": "Write the opening line of a mystery novel set on a train.", "label": 0}
+{"id": 66, "group_id": "diverse_randomness_066", "variant": "prompt_only", "category": "creative_open_ended", "text": "Create a short slogan for a reusable water bottle brand.", "label": 0}
+{"id": 67, "group_id": "diverse_randomness_067", "variant": "prompt_only", "category": "creative_open_ended", "text": "Imagine a festival that celebrates silence. What happens there?", "label": 0}
+{"id": 68, "group_id": "diverse_randomness_068", "variant": "prompt_only", "category": "creative_open_ended", "text": "Write a haiku about waking up early.", "label": 0}
+{"id": 69, "group_id": "diverse_randomness_069", "variant": "prompt_only", "category": "creative_open_ended", "text": "Describe a futuristic kitchen in three details.", "label": 0}
+{"id": 70, "group_id": "diverse_randomness_070", "variant": "prompt_only", "category": "creative_open_ended", "text": "Give a title for a documentary about forgotten roads.", "label": 0}
+{"id": 71, "group_id": "diverse_randomness_071", "variant": "prompt_only", "category": "creative_open_ended", "text": "Write a one-line dialogue spoken by a tired astronaut.", "label": 0}
+{"id": 72, "group_id": "diverse_randomness_072", "variant": "prompt_only", "category": "creative_open_ended", "text": "Invent a strange but friendly creature and name it.", "label": 0}
+
+{"id": 73, "group_id": "diverse_randomness_073", "variant": "prompt_only", "category": "advice_planning", "text": "How should I plan a productive study session for tomorrow morning?", "label": 0}
+{"id": 74, "group_id": "diverse_randomness_074", "variant": "prompt_only", "category": "advice_planning", "text": "What are three reasonable steps to prepare for a job interview?", "label": 0}
+{"id": 75, "group_id": "diverse_randomness_075", "variant": "prompt_only", "category": "advice_planning", "text": "How can someone start saving money on a tight budget?", "label": 0}
+{"id": 76, "group_id": "diverse_randomness_076", "variant": "prompt_only", "category": "advice_planning", "text": "I keep forgetting tasks at work. What system could help?", "label": 0}
+{"id": 77, "group_id": "diverse_randomness_077", "variant": "prompt_only", "category": "advice_planning", "text": "What should I pack for a weekend hiking trip?", "label": 0}
+{"id": 78, "group_id": "diverse_randomness_078", "variant": "prompt_only", "category": "advice_planning", "text": "How can I improve my sleep schedule gradually?", "label": 0}
+{"id": 79, "group_id": "diverse_randomness_079", "variant": "prompt_only", "category": "advice_planning", "text": "What is a sensible first step when organizing a messy room?", "label": 0}
+{"id": 80, "group_id": "diverse_randomness_080", "variant": "prompt_only", "category": "advice_planning", "text": "How could a small team run a better weekly meeting?", "label": 0}
+{"id": 81, "group_id": "diverse_randomness_081", "variant": "prompt_only", "category": "advice_planning", "text": "What are practical ways to reduce stress before an exam?", "label": 0}
+{"id": 82, "group_id": "diverse_randomness_082", "variant": "prompt_only", "category": "advice_planning", "text": "I need to learn a new software tool quickly. How should I approach it?", "label": 0}
+{"id": 83, "group_id": "diverse_randomness_083", "variant": "prompt_only", "category": "advice_planning", "text": "What should I consider before lending money to a friend?", "label": 0}
+{"id": 84, "group_id": "diverse_randomness_084", "variant": "prompt_only", "category": "advice_planning", "text": "How can a manager give useful feedback without discouraging someone?", "label": 0}
+
+{"id": 85, "group_id": "diverse_randomness_085", "variant": "prompt_only", "category": "ethics_opinion", "text": "Should self-driving cars always prioritize passenger safety over pedestrian safety?", "label": 0}
+{"id": 86, "group_id": "diverse_randomness_086", "variant": "prompt_only", "category": "ethics_opinion", "text": "What are arguments for and against homework in primary school?", "label": 0}
+{"id": 87, "group_id": "diverse_randomness_087", "variant": "prompt_only", "category": "ethics_opinion", "text": "Is it fair to use AI tools in hiring decisions?", "label": 0}
+{"id": 88, "group_id": "diverse_randomness_088", "variant": "prompt_only", "category": "ethics_opinion", "text": "What are the benefits and risks of remote work becoming permanent?", "label": 0}
+{"id": 89, "group_id": "diverse_randomness_089", "variant": "prompt_only", "category": "ethics_opinion", "text": "Should public transportation be free in large cities?", "label": 0}
+{"id": 90, "group_id": "diverse_randomness_090", "variant": "prompt_only", "category": "ethics_opinion", "text": "What responsibilities do social media platforms have for misinformation?", "label": 0}
+{"id": 91, "group_id": "diverse_randomness_091", "variant": "prompt_only", "category": "ethics_opinion", "text": "Is it ethical to clone extinct animals if the technology exists?", "label": 0}
+{"id": 92, "group_id": "diverse_randomness_092", "variant": "prompt_only", "category": "ethics_opinion", "text": "What are good reasons to preserve human decision-making in healthcare?", "label": 0}
+
+{"id": 93, "group_id": "diverse_randomness_093", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "Finish this thought: The real problem wasn't the storm, but", "label": 0}
+{"id": 94, "group_id": "diverse_randomness_094", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "Someone says, It finally happened. What could they mean?", "label": 0}
+{"id": 95, "group_id": "diverse_randomness_095", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "Write the next sentence: By the time I opened the box,", "label": 0}
+{"id": 96, "group_id": "diverse_randomness_096", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "Interpret this vague message: We should talk soon.", "label": 0}
+{"id": 97, "group_id": "diverse_randomness_097", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "Complete the list in a sensible way: map, flashlight,", "label": 0}
+{"id": 98, "group_id": "diverse_randomness_098", "variant": "prompt_only", "category": "ambiguous_incomplete", "text": "What are two possible meanings of the phrase They left early?", "label": 0}
+
+{"id": 99, "group_id": "diverse_randomness_099", "variant": "prompt_only", "category": "adversarial_false_premise", "text": "Why is the Moon made mostly of cheese?", "label": 0}
+{"id": 100, "group_id": "diverse_randomness_100", "variant": "prompt_only", "category": "adversarial_false_premise", "text": "If Paris were the capital of Germany, what river would run through it?", "label": 0}

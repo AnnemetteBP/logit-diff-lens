@@ -114,7 +114,7 @@ def main() -> None:
 
     model = AutoModelForCausalLM.from_pretrained(
         args.model_name,
-        torch_dtype=dtype,
+        dtype=dtype,
     ).to(device)
     model.eval()
 

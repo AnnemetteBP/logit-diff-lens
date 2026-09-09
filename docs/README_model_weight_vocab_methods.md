@@ -46,7 +46,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --dtype bfloat16 \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm
@@ -96,11 +95,14 @@ The generation config is where the generation-side prompt source, prompt formatt
 
 ## Shared capture guidance
 
+These analyses often reuse saved hidden states or saved logits rather than introducing a separate capture surface of their own. So the important parameters are usually upstream capture requirements.
+
 For prompt-side reuse, the usual reusable capture surface is:
 
 - `--force-include-input` when the embedding-side view matters
 - `--force-include-output` when the output-side L+1 view matters
 - `--norm-modes raw model_norm` when you want both direct and final-norm LM-head projections
+- `--padding` when the prompt-side source comes from a dataset-style capture and tokenizer padding behavior should be fixed explicitly
 
 For generation-side reuse, the parallel controls are:
 
@@ -110,9 +112,14 @@ For generation-side reuse, the parallel controls are:
 - `--padding`
 - `--max-new-tokens`
 - `--batch-size`
+- `--do-sample`
+- `--temperature`
+- `--seed`
 - `--force-include-input`
 - `--force-include-output`
 - `--norm-modes`
+
+If the downstream method projects logits or compares output-side token rankings, `--force-include-output` should be treated as required upstream. If the downstream method uses embedding-side or input-side views, `--force-include-input` should also be treated as required upstream.
 
 ## Shared interpretation
 

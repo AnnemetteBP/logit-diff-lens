@@ -27,9 +27,10 @@ def _find_source_hidden(source_artifact: PromptDecodeArtifact, layer_index: int,
     validate_prompt_decode_artifact(source_artifact)
     for record in source_artifact.layer_records:
         if record.layer_index == layer_index:
-            if position >= record.hidden.shape[1]:
+            hidden = record.get_hidden("raw")
+            if position >= hidden.shape[1]:
                 raise ValueError(f"source_position {position} out of range for layer {layer_index}")
-            return record.hidden[:, position : position + 1, :].clone()
+            return hidden[:, position : position + 1, :].clone()
     raise ValueError(f"Could not find source layer_index={layer_index} in source artifact")
 
 

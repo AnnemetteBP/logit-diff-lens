@@ -121,6 +121,7 @@ PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
   --prompt "<prompt-text>" \
   --output-path tmp/<run-root>/figures/<generation-heatmap>.pdf \
   --plot-kind jaccard \
+  --analysis-topk 10 \
   --top-k 10 \
   --truncate \
   --max-length 512 \
@@ -140,6 +141,10 @@ PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
   --show-marginals \
   --max-new-tokens 32 \
   --batch-size 8 \
+  --do-sample \
+  --temperature 0.7 \
+  --seed 17 \
+  --comparison-top-ks 1 5 10 \
   --norm-modes raw unit_norm eps_norm model_norm
 ```
 

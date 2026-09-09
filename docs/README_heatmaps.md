@@ -4,13 +4,20 @@
 
 ## Overview
 
-`LogitDiff` includes several heatmap families built on the same general plotting surface. Prompt-side and generation-side heatmaps belong to the same toolkit and reuse the same plotting ideas wherever the code already supports them.
+`LogitDiff` uses one plotting family for prompt-side and generation-side lens analysis, plus reusable single-model and ADL heatmaps for follow-up inspection.
 
-## Shared plotting vocabulary
+The main public cases are:
 
-The public prompt and generation heatmap wrappers both support saved-payload plotting and live compute-and-plot workflows.
+- prompt `LogitDiff` heatmaps
+- generation `LogitDiff` heatmaps
+- single-model logit-lens heatmaps
+- ADL heatmaps
 
-Shared plotting controls:
+The older `LDL` path is still present in the repo, but public prompt-side comparison should be read through the prompt `LogitDiff` heatmap surface rather than as a separate front-door workflow.
+
+## Shared plotting controls
+
+Prompt and generation `LogitDiff` heatmaps share the same core plotting controls wherever the wrapper CLIs already overlap:
 
 - `--input-path: str`
 - `--output-path: str`
@@ -19,73 +26,83 @@ Shared plotting controls:
 - `--prompt-index: int`
 - `--prompt-text: str`
 - `--top-k: int`
+- `--analysis-topk: int`
 - `--display-top-tokens: int`
 - `--visible-cell-tokens: int`
 - `--max-token-chars: int`
-- `--exclude-prompt-tokens: bool`
-- `--exclude-generated-tokens: bool`
+- `--exclude-prompt-tokens`
+- `--exclude-generated-tokens`
 - `--start-position: int`
 - `--end-position: int`
 - `--max-layers: int`
 - `--max-divergent-layers: int`
-- `--layer-selection: str`
+- `--layer-selection: all | most_divergent | least_divergent`
 - `--keep-last-layer-fraction: float`
+- `--x-tick-mode: str`
+- `--x-tick-mode-secondary: str`
 - `--title: str`
 - `--colorscale: str`
-- `--show-marginals: bool`
-- `--analysis-topk: int`
+- `--show-marginals`
 
 Alias notes:
 
 - `--start-position` and `--end-position` map to `start_idx` and `end_idx`
-- `--max-layers` and `--max-divergent-layers` are wrapper aliases for the visible-layer limit
-- `--top-k`, `--display-top-tokens`, and `--visible-cell-tokens` are related but not identical
+- `--max-layers` and `--max-divergent-layers` both act as visible-layer limits in the public wrappers
+- `--top-k`, `--display-top-tokens`, and `--visible-cell-tokens` are related but not identical controls
 
-Live prompt/generation workflows additionally expose the capture inputs that define what gets plotted:
+When you compute live instead of plotting from file, the same heatmap wrapper also takes the upstream capture inputs that produce the payload first:
 
 - `--model-name`
 - `--comparison-model-name` or `--comparison-adapter-path`
 - `--prompt` or `--dataset-path`
 - `--text-field`
-- `--label-field` where supported
+- `--label-field`
 - `--use-chat-template`
 - `--prompt-format`
 - `--system-prompt`
+- `--comparison-use-chat-template`
+- `--comparison-prompt-format`
+- `--comparison-system-prompt`
+- `--no-add-special-tokens`
 - `--truncate`
 - `--max-length`
-- `--padding`
 - `--force-include-input`
 - `--force-include-output`
 - `--norm-modes`
+- `--readout-mode`
+- `--collect-components`
+- `--project-component-logits`
+- `--save-logits`
+- `--stable-analysis`
 
-Generation live workflows additionally expose generation-condition inputs:
+Generation live runs additionally expose generation-side inputs:
 
+- `--padding`
 - `--max-new-tokens`
 - `--batch-size`
 - `--analyze-special-tokens`
+- `--do-sample`
+- `--temperature`
+- `--seed`
+- `--comparison-top-ks`
 - `--custom-generate`
 
-## Prompt heatmap families
+Mode contract:
 
-### Prompt Jaccard heatmap
+- saved mode uses `--input-path` plus plotting controls only
+- live mode uses model and prompt or dataset inputs and computes the payload before plotting
+- the public heatmap CLIs now reject mixed saved and live inputs instead of guessing
 
-Source: `jaccard_heatmap_plotter.py`
+## Prompt LogitDiff heatmaps
 
-What it plots:
+### Prompt Jaccard
 
-- top-k token-set overlap between the two prompt-side runs across layers and positions
-
-Input style:
-
-- saved prompt-side results
-- or live prompt capture plus comparison through the same wrapper CLI
-
-Example:
+Use this when you want the overlap structure between two prompt-side runs across layers and token positions.
 
 ```bash
 PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
-  --input-path tmp/<prompt-results>.json \
-  --output-path tmp/<prompt-jaccard>.pdf \
+  --input-path tmp/artifacts/<prompt-logitdiff-payload> \
+  --output-path tmp/artifacts/<prompt-jaccard>.pdf \
   --format pdf \
   --plot-kind jaccard \
   --prompt-index 0 \
@@ -93,42 +110,32 @@ PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
   --top-k 10 \
   --display-top-tokens 10 \
   --visible-cell-tokens 10 \
-  --exclude-generated-tokens \
   --start-position 0 \
   --end-position 64 \
   --max-layers 6 \
   --layer-selection all \
   --x-tick-mode base_generated \
-  --title "Prompt Jaccard" \
+  --title "Prompt LogitDiff Jaccard" \
   --colorscale RdBu \
   --show-marginals
 ```
 
-Prompt Jaccard x-axis modes currently exposed by the public wrapper:
+This is a saved-artifact workflow. It does not recollect the prompt run.
+
+Prompt Jaccard x-axis labels currently support:
 
 - `prompt`
 - `base_generated`
 - `position`
 
-### Prompt next-token verification heatmap
+### Prompt next-token verification
 
-Source: `prompt_lens_heatmap_plotter.py`
-
-What it plots:
-
-- whether the compared prompt-side runs share the same next-token behavior across positions and selected layers
-
-Input style:
-
-- saved prompt payload
-- or live prompt capture plus comparison through the same wrapper CLI
-
-Example:
+Use this when you want the prompt-style verification layout showing shared versus non-shared next-token behavior over selected layers.
 
 ```bash
 PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
-  --input-path tmp/<prompt-payload>.json \
-  --output-path tmp/<prompt-verification>.pdf \
+  --input-path tmp/artifacts/<prompt-logitdiff-payload> \
+  --output-path tmp/artifacts/<prompt-verification>.pdf \
   --format pdf \
   --plot-kind next_token_verification \
   --prompt-index 0 \
@@ -138,26 +145,18 @@ PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
   --start-position 0 \
   --end-position 64 \
   --max-token-chars 12 \
-  --title "Prompt Next-Token Verification" \
+  --title "Prompt LogitDiff Verification" \
   --colorscale RdBu
 ```
 
 ### Prompt comparison-metric heatmap
 
-What it plots:
-
-- scalar prompt-side comparison metrics from the saved comparison artifact
-
-Input style:
-
-- saved prompt comparison artifact
-
-Example:
+This is the separate scalar comparison-artifact view, not a replacement for the prompt `LogitDiff` heatmaps above.
 
 ```bash
 PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
-  --input-path tmp/artifacts/<comparison-run>.pt \
-  --output-path tmp/artifacts/<comparison-run>.pdf \
+  --input-path tmp/artifacts/<prompt-comparison>.pt \
+  --output-path tmp/artifacts/<prompt-comparison>.pdf \
   --format pdf \
   --plot-kind comparison_metric \
   --metric jsd_ft_base \
@@ -165,28 +164,15 @@ PYTHONPATH=src python pipelines/plot_prompt_heatmap.py \
   --colorscale RdBu
 ```
 
-This comparison-metric view is separate from the original prompt-lens heatmap families.
+## Generation LogitDiff heatmaps
 
-## Generation heatmap families
+### Generation Jaccard
 
-### Generation Jaccard heatmap
-
-Source: `logitdiff_gen_plotter.py`
-
-What it plots:
-
-- top-k token-set overlap between the two generation-side runs across layers and token positions
-
-Input style:
-
-- saved generation payload
-- or live generation capture plus comparison through the same wrapper CLI
-
-Example:
+Use this when you want layer-by-layer overlap across continuation-time decoding.
 
 ```bash
 PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
-  --input-path tmp/<run-root>/data/<layerwise-json>.json \
+  --input-path tmp/<run-root>/data/<generation-payload>.json \
   --output-path tmp/<run-root>/figures/<generation-jaccard>.pdf \
   --format pdf \
   --plot-kind jaccard \
@@ -201,12 +187,14 @@ PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
   --layer-selection all \
   --x-tick-mode ft_generated \
   --x-tick-mode-secondary base_generated \
-  --title "Generation Jaccard" \
+  --title "Generation LogitDiff Jaccard" \
   --colorscale RdBu \
   --show-marginals
 ```
 
-Generation Jaccard x-axis modes currently exposed:
+This is a saved-artifact workflow. It does not rerun generation.
+
+Generation Jaccard x-axis selectors currently exposed:
 
 - `ft_generated`
 - `base_generated`
@@ -215,26 +203,18 @@ Generation Jaccard x-axis modes currently exposed:
 - `input_tokens`
 - `position`
 
-The primary x-axis is controlled by `--x-tick-mode` and the second x-axis is controlled by `--x-tick-mode-secondary`. The common comparison layout is primary axis = comparison or FT predictions and secondary axis = base predictions.
+The usual comparison layout is:
 
-### Generation next-token verification heatmap
+- primary x-axis = comparison or FT tokens
+- secondary x-axis = base tokens
 
-Source: `logitdiff_gen_plotter.py`
+### Generation next-token verification
 
-What it plots:
-
-- whether the compared generation runs share the same next-token behavior across positions and selected layers
-
-Input style:
-
-- saved generation payload
-- or live generation capture plus comparison through the same wrapper CLI
-
-Example:
+Use this when you want the generation-side verification layout instead of the Jaccard cell view.
 
 ```bash
 PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
-  --input-path tmp/<run-root>/data/<layerwise-json>.json \
+  --input-path tmp/<run-root>/data/<generation-payload>.json \
   --output-path tmp/<run-root>/figures/<generation-verification>.pdf \
   --format pdf \
   --plot-kind next_token_verification \
@@ -245,54 +225,97 @@ PYTHONPATH=src python pipelines/plot_generation_heatmap.py \
   --start-position 0 \
   --end-position 64 \
   --max-token-chars 12 \
-  --title "Generation Next-Token Verification" \
+  --title "Generation LogitDiff Verification" \
   --colorscale RdBu
 ```
 
-### Generation paper heatmaps
+### Generation paper layouts
 
-Sources:
+For the paper-oriented generation exports, the main project reuses the existing plotting functions under:
 
-- `logitdiff_gen_paper_plotter.py`
-- `logitdiff_gen_paper_plotter_selected_rows.py`
+- `logit_diff_lens.plotting.plot_logitdiff_top_layer_chunked_heatmap`
+- `logit_diff_lens.plotting.plot_logitdiff_top_layer_selected_rows_heatmap`
 
-What they plot:
+These are the chunked and selected-row layouts used for paper-style figure exports from saved generation payloads.
 
-- paper-oriented generation layouts such as chunked views and selected-row exports
+## Single-model heatmap
 
-Input style:
+Use the single-model heatmap when you are not comparing two systems, but instead want one model’s own layerwise behavior for a chosen scalar metric.
 
-- saved generation payloads used for figure export
+The public wrapper supports both saved data and live prompt-side plotting.
 
-## Other heatmap families
+```bash
+PYTHONPATH=src python pipelines/plot_single_model_heatmap.py \
+  --model-name <model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<single-model-heatmap>.pdf \
+  --format pdf \
+  --metric entropy \
+  --norm-mode model_norm \
+  --top-k 10 \
+  --force-include-input \
+  --force-include-output \
+  --block-steps 1 \
+  --start-position 0 \
+  --end-position 64 \
+  --show-marginals \
+  --title "Single-Model Logit Lens"
+```
 
-### Single-model logit-lens heatmap
+Supported single-model metric selector values:
 
-Source: `logit_lens_plotter.py`
+- `logits_mean`
+- `logits_std`
+- `logit_margin`
+- `probs`
+- `probs_std`
+- `ground_truth_probs`
+- `entropy`
+- `perplexity`
+- `kl_div_prev`
+- `kl_div_last`
+- `js_div_prev`
+- `js_div_last`
+- `cos_sim_prev`
+- `cos_sim_last`
+- `l2_dist_prev`
+- `l2_dist_last`
+- `jaccard_prev`
+- `jaccard_last`
+- `topk_accuracy`
 
-Use it for single-model prompt or generation readouts when you want scalar views such as entropy, perplexity, KL or JS to previous or last layer, Jaccard to previous or last layer, accuracy, and related diagnostics.
+## ADL heatmap
 
-### LDL heatmap
+Use ADL when you want delta-style views derived from the difference between two runs rather than the Jaccard-style comparison cell layout.
 
-Source: `ldl_plotter.py`
+The public wrapper supports:
 
-Use it for pairwise prompt-side divergence views such as:
+- live model A vs model B plotting
+- live base model vs adapter plotting
+- plotting from a saved ADL payload
 
-- `kl_div_ab`
-- `kl_div_ba`
-- `js_div`
-- `js_dist`
-- `tvd`
-- `cos_sim`
-- `l2_dist`
-- `jaccard`
-- `disagreement_correct_top1`
+Saved ADL mode is still separate from live comparison mode. If you pass `--input-path`, do not also pass live comparison inputs such as `--comparison-model-name` or `--prompt`.
 
-### ADL heatmap
+```bash
+PYTHONPATH=src python pipelines/plot_adl_heatmap.py \
+  --model-name <base-model-name> \
+  --comparison-model-name <comparison-model-name> \
+  --prompt "<prompt-text>" \
+  --output-path tmp/artifacts/<adl-heatmap>.pdf \
+  --format pdf \
+  --metric kl_div \
+  --norm-mode model_norm \
+  --top-k 10 \
+  --force-include-input \
+  --force-include-output \
+  --block-steps 1 \
+  --start-position 0 \
+  --end-position 64 \
+  --show-marginals \
+  --title "ADL Heatmap"
+```
 
-Source: `adl_plotter.py`
-
-Use it for delta-style views derived from hidden-state or readout differences, including metrics such as:
+Supported ADL metric selector values:
 
 - `logit_max`
 - `delta_norm`
@@ -300,29 +323,40 @@ Use it for delta-style views derived from hidden-state or readout differences, i
 - `entropy`
 - `kl_div`
 
-### Paired-condition heatmaps
+## Other existing heatmaps
 
-Source: `logitdiff_pair_heatmap_plotter.py`
+The repo also still contains:
 
-These cover paired-condition token heatmaps and single pairwise condition heatmaps for condition, template, or prompting comparisons.
+- paired-condition heatmaps in `logit_diff_lens.plotting.logitdiff_pair_heatmap_plotter`
+- the older internal `LDL` comparison path
 
-## Live generation note
+Those remain available for specialized work, but the main public comparison surface is the prompt and generation `LogitDiff` heatmap family above.
 
-When plotting directly from a live generation run instead of a saved payload, the plotting controls stay the same. The extra inputs are the generation workflow controls that determine how the payload is produced first, such as:
+## Live plotting note
 
-- plain prompting vs. chat-template prompting
-- `user_assistant_prefix` prompting
+When you compute and plot in one command instead of reading from `--input-path`, the plotting controls stay the same and the wrapper additionally needs the inputs that create the payload first.
+
+For prompt-side live plotting this means the prompt or dataset inputs, formatting mode, tokenization settings, and `force_include_input` or `force_include_output`.
+
+For generation-side live plotting this additionally means continuation-time controls such as:
+
+- template or no-template prompting
+- `user_assistant_prefix`
 - optional `system_prompt`
-- generation length and batching
-- decoding and custom-generation settings exposed by the wrapper path
+- `max_new_tokens`
+- `batch_size`
+- padding behavior
 
 ## Output and interpretation
 
-All public heatmap wrappers support Plotly output to `html` or static export to `pdf`.
+All public heatmap wrappers save either:
 
-Read the result as a layer-by-position map over one chosen analysis family:
+- Plotly `html`
+- static `pdf`
 
-- Jaccard heatmaps show token-set overlap
-- next-token verification heatmaps show agreement structure over selected layers
-- comparison-metric heatmaps show scalar prompt-side divergence
-- LDL and ADL heatmaps show alternative pairwise or delta views over the same general LogitDiff analysis space
+Interpretation depends on the family:
+
+- prompt or generation `LogitDiff` Jaccard heatmaps show token-set overlap and disagreement structure
+- prompt or generation verification heatmaps show next-token agreement structure over selected layers
+- single-model heatmaps show one model’s own scalar layerwise behavior
+- ADL heatmaps show delta-derived scalar views after comparing two runs

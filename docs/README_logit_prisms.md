@@ -52,7 +52,6 @@ PYTHONPATH=src python pipelines/capture_prompt_artifacts.py \
   --dtype bfloat16 \
   --truncate \
   --max-length 512 \
-  --padding longest \
   --force-include-input \
   --force-include-output \
   --norm-modes raw model_norm \
@@ -108,11 +107,25 @@ The same generation config controls the prompt source, prompt format, template c
 
 In practice, prompt prisms and generation prisms are the same style of follow-up analysis over two different artifact families. The important consistency requirement is that both routes stay tied to the same wrapper-controlled tokenization, masks, and readout surface.
 
-For prompt-side reuse, the recommended capture surface is still:
+## Direct parameters vs. upstream capture requirements
+
+Prism-style analysis usually depends on saved artifacts rather than its own standalone capture CLI, so the important logit-related controls are usually upstream capture requirements.
+
+For prompt-side reuse, the recommended capture surface is:
 
 - `--force-include-input` for the input embedding view
 - `--force-include-output` for the output-side L+1 view
 - `--norm-modes raw model_norm` when you want both direct and final-norm readouts
+- `--padding` when the prompt-side source is dataset-oriented and tokenizer padding behavior should be fixed explicitly
+
+For generation-side reuse, the corresponding capture surface is:
+
+- `--force-include-input`
+- `--force-include-output`
+- `--norm-modes raw unit_norm eps_norm model_norm`
+- `--collect-components`
+- `--project-component-logits`
+- `--do-sample`, `--temperature`, and `--seed` when the continuation conditions themselves matter for the prism interpretation
 
 ## How to interpret the result
 

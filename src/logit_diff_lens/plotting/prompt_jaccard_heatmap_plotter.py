@@ -1,0 +1,825 @@
+"""Package-owned prompt Jaccard heatmap tool with the restored original styling."""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import plotly.graph_objects as go
+from plotly.colors import sample_colorscale
+from plotly.subplots import make_subplots
+
+from .plotly_export import save_plotly_figure
+
+
+def _clean_token(token: str | None) -> str:
+    if token is None:
+        return ""
+    token = str(token)
+    replacements = {
+        "<|begin_text|>": "BOS",
+        "<|begin_of_text|>": "BOS",
+        "<begin_text>": "BOS",
+        "<begin_of_text>": "BOS",
+        "<s>": "BOS",
+        "<|end_text|>": "EOS",
+        "<|end_of_text|>": "EOS",
+        "<end_text>": "EOS",
+        "<end_of_text>": "EOS",
+        "</s>": "EOS",
+        "<pad>": "PAD",
+        "<|pad|>": "PAD",
+        "<unk>": "UNK",
+        "<|unk|>": "UNK",
+    }
+    token = replacements.get(token, token)
+    token = token.replace("Ġ", " ").replace("▁", " ")
+    token = token.replace("\n", "\\n")
+    return token.strip() or " "
+
+
+def _truncate(text: str, max_chars: int) -> str:
+    if len(text) <= max_chars:
+        return text
+    if max_chars <= 1:
+        return text[:max_chars]
+    return text[: max_chars - 1] + "…"
+
+
+def _strip_chat_role_prefix(text: str) -> str:
+    return re.sub(r"^\s*(?:User|Assistant|System)\s*:\s*", "", text, flags=re.IGNORECASE)
+
+
+def _display_prompt_text(prompt: str) -> str:
+    lines = [line.strip() for line in str(prompt).splitlines() if line.strip()]
+    cleaned: list[str] = []
+    for line in lines:
+        lowered = line.lower()
+        if lowered.startswith("assistant:"):
+            break
+        cleaned.append(_strip_chat_role_prefix(line))
+    if cleaned:
+        return " ".join(cleaned).strip()
+    return _strip_chat_role_prefix(str(prompt)).strip()
+
+
+def _load_payload(payload_or_path: dict[str, Any] | str | Path) -> dict[str, Any]:
+    if isinstance(payload_or_path, dict):
+        return payload_or_path
+    path = Path(payload_or_path)
+    with path.open("r", encoding="utf-8") as handle:
+        return json.load(handle)
+
+
+def _extract_results(payload: dict[str, Any]) -> dict[str, Any]:
+    if "results" in payload and isinstance(payload["results"], dict):
+        return payload["results"]
+    return payload
+
+
+def _sorted_layer_keys(results: dict[str, Any]) -> list[str]:
+    return sorted(results.keys(), key=float)
+
+
+def _select_prompt(
+    results: dict[str, Any],
+    prompt_index: int | None,
+    prompt_text: str | None,
+) -> list[dict[str, Any]]:
+    layer_keys = _sorted_layer_keys(results)
+    if not layer_keys:
+        raise ValueError("No layers found in LogitDiff results.")
+
+    prompts = [entry["prompt"] for entry in results[layer_keys[0]]]
+    if not prompts:
+        raise ValueError("No prompt entries found in LogitDiff results.")
+
+    if prompt_text is not None:
+        if prompt_text not in prompts:
+            raise ValueError(f"Prompt not found. Available prompts are: {prompts}")
+        prompt_index = prompts.index(prompt_text)
+    elif prompt_index is None:
+        prompt_index = 0
+
+    if prompt_index < 0 or prompt_index >= len(prompts):
+        raise IndexError(f"prompt_index={prompt_index} is out of range for {len(prompts)} prompts.")
+
+    return [results[layer_key][prompt_index] for layer_key in layer_keys]
+
+
+def _filter_positions(
+    positions: list[dict[str, Any]],
+    *,
+    include_prompt_tokens: bool,
+    include_generated_tokens: bool,
+) -> list[dict[str, Any]]:
+    filtered: list[dict[str, Any]] = []
+    for position in positions:
+        is_generated = bool(position.get("is_generated", False))
+        if is_generated and not include_generated_tokens:
+            continue
+        if not is_generated and not include_prompt_tokens:
+            continue
+        filtered.append(position)
+    return filtered
+
+
+def _slice_positions(
+    positions: list[dict[str, Any]],
+    start_idx: int | None,
+    end_idx: int | None,
+) -> list[dict[str, Any]]:
+    start = 0 if start_idx is None else start_idx
+    stop = len(positions) if end_idx is None else end_idx
+    return positions[start:stop]
+
+
+def _pair_positions(positions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if len(positions) < 2:
+        raise ValueError("Need at least two positions to build the prompt Jaccard heatmap.")
+    pairs: list[dict[str, Any]] = []
+    for idx in range(len(positions) - 1):
+        predictor = positions[idx]
+        target = positions[idx + 1]
+        pairs.append(
+            {
+                "predictor_position": int(predictor["position"]),
+                "target_position": int(target["position"]),
+                "predictor_token": _clean_token(predictor.get("input_token")),
+                "target_token": _clean_token(target.get("input_token")),
+                "is_generated": bool(predictor.get("is_generated", False)),
+            }
+        )
+    return pairs
+
+
+def _build_cell_parts(
+    position: dict[str, Any],
+    *,
+    display_top_tokens: int,
+    max_token_chars: int,
+) -> dict[str, list[str]]:
+    shared = [
+        _truncate(_clean_token(token), max_token_chars)
+        for token in position.get("intersection", [])[:display_top_tokens]
+    ]
+    only_base = [
+        _truncate(_clean_token(token), max_token_chars)
+        for token in position.get("only_base", [])[:display_top_tokens]
+    ]
+    only_ft = [
+        _truncate(_clean_token(token), max_token_chars)
+        for token in position.get("only_finetuned", [])[:display_top_tokens]
+    ]
+    return {"shared": shared, "base_only": only_base, "finetuned_only": only_ft}
+
+
+def _build_hover_text(
+    layer_result: dict[str, Any],
+    predictor_position: dict[str, Any],
+    *,
+    predictor_token: str,
+    target_token: str,
+) -> str:
+    shared = ", ".join(_clean_token(token) for token in predictor_position.get("intersection", []))
+    only_base = ", ".join(_clean_token(token) for token in predictor_position.get("only_base", []))
+    only_ft = ", ".join(_clean_token(token) for token in predictor_position.get("only_finetuned", []))
+    return (
+        f"<b>Layer</b>: {layer_result['layer_relative']} (abs {layer_result['layer_absolute']})<br>"
+        f"<b>Predictor token</b>: {predictor_token}<br>"
+        f"<b>Target token</b>: {target_token}<br>"
+        f"<b>Position</b>: {predictor_position['position']} → {predictor_position['position'] + 1}<br>"
+        f"<b>IoU</b>: {float(predictor_position['iou']):.4f}<br>"
+        f"<b>Shared</b>: {shared or '—'}<br>"
+        f"<b>Base only</b>: {only_base or '—'}<br>"
+        f"<b>Finetuned only</b>: {only_ft or '—'}"
+    )
+
+
+def _cell_annotation_html(parts: dict[str, list[str]], visible_rows: int) -> str:
+    def _quote(token: str) -> str:
+        return f"'{token}'"
+
+    def _wrap_shared_tokens(tokens: list[str], *, max_per_line: int = 2, max_chars: int = 24) -> str:
+        if not tokens:
+            return "—"
+        lines: list[str] = []
+        current: list[str] = []
+        current_len = 0
+        for token in tokens:
+            token_len = len(token)
+            if current and (len(current) >= max_per_line or current_len + 2 + token_len > max_chars):
+                lines.append(", ".join(current))
+                current = [token]
+                current_len = token_len
+            else:
+                if current:
+                    current_len += 2 + token_len
+                else:
+                    current_len = token_len
+                current.append(token)
+        if current:
+            lines.append(", ".join(current))
+        return "<br>".join(lines)
+
+    shared_tokens = parts["shared"][:visible_rows]
+    if not shared_tokens:
+        shared = "—"
+        shared_line_count = 1
+    else:
+        quoted = [_quote(token) for token in shared_tokens]
+        shared = _wrap_shared_tokens(quoted)
+        shared_line_count = len(shared.split("<br>"))
+    max_total_lines = max(2, visible_rows)
+    available_bottom_rows = max(1, max_total_lines - shared_line_count)
+    bottom_pairs: list[str] = []
+    partial_used = False
+    for idx in range(visible_rows):
+        left = parts["base_only"][idx] if idx < len(parts["base_only"]) else "—"
+        right = parts["finetuned_only"][idx] if idx < len(parts["finetuned_only"]) else "—"
+        if left == "—" and right == "—":
+            continue
+        if len(bottom_pairs) >= available_bottom_rows:
+            break
+        is_partial = (left == "—") != (right == "—")
+        if is_partial and partial_used:
+            continue
+        left_text = _quote(left) if left != "—" else left
+        right_text = _quote(right) if right != "—" else right
+        bottom_pairs.append(f"{left_text} <> {right_text}")
+        if is_partial:
+            partial_used = True
+    bottom = "<br>".join(bottom_pairs) if bottom_pairs else "—"
+    return (
+        "<span style='font-weight:700; font-size:1.08em'>"
+        f"{shared}"
+        "</span><br>"
+        f"{bottom}"
+    )
+
+
+def _rgb_components(color: str) -> tuple[float, float, float]:
+    color = color.strip()
+    if color.startswith("rgb("):
+        values = color[4:-1].split(",")
+    elif color.startswith("rgba("):
+        values = color[5:-1].split(",")[:3]
+    else:
+        return (0.0, 0.0, 0.0)
+    r, g, b = [float(v.strip()) for v in values[:3]]
+    return r / 255.0, g / 255.0, b / 255.0
+
+
+def _text_color_for_value(value: float, colorscale: str, zmin: float, zmax: float) -> str:
+    if zmax <= zmin:
+        norm = 0.5
+    else:
+        norm = max(0.0, min(1.0, (value - zmin) / (zmax - zmin)))
+    sampled = sample_colorscale(colorscale, [norm])[0]
+    r, g, b = _rgb_components(sampled)
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "white" if luminance < 0.45 else "black"
+
+
+def _compact_layer_label(layer_absolute: int, total_model_layers: int) -> str:
+    return f"L{layer_absolute + 1}/{total_model_layers}"
+
+
+def _compact_model_label(label: str | None, fallback: str) -> str:
+    if not label:
+        return fallback
+    text = str(label).strip()
+    if not text:
+        return fallback
+    parts = Path(text).parts
+    for part in parts:
+        if part.startswith("models--"):
+            model_name = part[len("models--") :].replace("--", "/")
+            return model_name or fallback
+    snapshot_match = re.search(r"models--([^/]+(?:--[^/]+)*)/snapshots/", text)
+    if snapshot_match:
+        model_name = snapshot_match.group(1).replace("--", "/")
+        return model_name or fallback
+    return Path(text).name or text
+
+
+def _prepare_heatmap_data(
+    payload_or_path: dict[str, Any] | str | Path,
+    *,
+    prompt_index: int | None,
+    prompt_text: str | None,
+    include_prompt_tokens: bool,
+    include_generated_tokens: bool,
+    start_idx: int | None,
+    end_idx: int | None,
+    display_top_tokens: int,
+    max_token_chars: int,
+    max_layers: int | None,
+    layer_selection: str,
+) -> dict[str, Any]:
+    payload = _load_payload(payload_or_path)
+    results = _extract_results(payload)
+    per_layer_prompt_results = _select_prompt(results, prompt_index, prompt_text)
+    all_positions = per_layer_prompt_results[0]["positions"]
+    filtered_positions = _slice_positions(
+        _filter_positions(
+            all_positions,
+            include_prompt_tokens=include_prompt_tokens,
+            include_generated_tokens=include_generated_tokens,
+        ),
+        start_idx,
+        end_idx,
+    )
+    pairs = _pair_positions(filtered_positions)
+    selected_predictor_positions = [pair["predictor_position"] for pair in pairs]
+    position_to_column = {
+        position: idx for idx, position in enumerate(selected_predictor_positions)
+    }
+
+    num_layers_total = len(per_layer_prompt_results)
+    total_model_layers = max(int(layer_result["layer_absolute"]) for layer_result in per_layer_prompt_results) + 1
+    candidate_indices = list(range(num_layers_total))
+    mean_iou_by_layer: list[tuple[float, int]] = []
+    for layer_idx in candidate_indices:
+        layer_positions = [
+            position
+            for position in per_layer_prompt_results[layer_idx]["positions"]
+            if int(position["position"]) in position_to_column
+        ]
+        if not layer_positions:
+            continue
+        mean_iou_by_layer.append((float(np.mean([float(position["iou"]) for position in layer_positions])), layer_idx))
+    if max_layers is not None and max_layers < len(mean_iou_by_layer):
+        if layer_selection == "most_divergent":
+            selected_layer_indices = [layer_idx for _, layer_idx in sorted(mean_iou_by_layer, key=lambda item: item[0])[:max_layers]]
+        elif layer_selection == "least_divergent":
+            selected_layer_indices = [layer_idx for _, layer_idx in sorted(mean_iou_by_layer, key=lambda item: item[0], reverse=True)[:max_layers]]
+        else:
+            selected_layer_indices = list(range(max_layers))
+    else:
+        selected_layer_indices = [layer_idx for _, layer_idx in mean_iou_by_layer]
+    selected_layer_indices = sorted(selected_layer_indices, key=lambda idx: float(per_layer_prompt_results[idx]["layer_relative"]))
+
+    num_layers = len(selected_layer_indices)
+    num_positions = len(pairs)
+    z = np.full((num_layers, num_positions), np.nan, dtype=float)
+    hover_text = np.empty((num_layers, num_positions), dtype=object)
+    cell_parts = np.empty((num_layers, num_positions), dtype=object)
+    y_labels: list[str] = []
+
+    for row_idx, original_layer_idx in enumerate(selected_layer_indices):
+        layer_result = per_layer_prompt_results[original_layer_idx]
+        y_labels.append(_compact_layer_label(int(layer_result["layer_absolute"]), total_model_layers))
+        layer_positions = {
+            int(position["position"]): position for position in layer_result["positions"]
+        }
+        for pair in pairs:
+            predictor_position = layer_positions.get(pair["predictor_position"])
+            if predictor_position is None:
+                continue
+            col_idx = position_to_column[pair["predictor_position"]]
+            z[row_idx, col_idx] = float(predictor_position["iou"])
+            hover_text[row_idx, col_idx] = _build_hover_text(
+                layer_result,
+                predictor_position,
+                predictor_token=pair["predictor_token"],
+                target_token=pair["target_token"],
+            )
+            cell_parts[row_idx, col_idx] = _build_cell_parts(
+                predictor_position,
+                display_top_tokens=display_top_tokens,
+                max_token_chars=max_token_chars,
+            )
+
+    mean_per_position = np.nanmean(z, axis=0)
+    mean_per_layer = np.nanmean(z, axis=1)
+    return {
+        "payload": payload,
+        "prompt": per_layer_prompt_results[0]["prompt"],
+        "display_prompt": _display_prompt_text(per_layer_prompt_results[0]["prompt"]),
+        "x_labels": [pair["predictor_token"] for pair in pairs],
+        "x_labels_secondary": [pair["target_token"] for pair in pairs],
+        "y_labels": y_labels,
+        "z": z,
+        "hover_text": hover_text,
+        "cell_parts": cell_parts,
+        "mean_per_position": mean_per_position,
+        "mean_per_layer": mean_per_layer,
+    }
+
+
+def plot_jaccard_heatmap(
+    payload_or_path: dict[str, Any] | str | Path,
+    prompt_index: int | None = None,
+    prompt_text: str | None = None,
+    include_prompt_tokens: bool = True,
+    include_generated_tokens: bool = True,
+    start_idx: int | None = None,
+    end_idx: int | None = None,
+    title: str | None = None,
+    colorscale: str = "RdBu",
+    display_top_tokens: int = 10,
+    visible_cell_tokens: int | None = None,
+    max_token_chars: int = 12,
+    show_marginals: bool = False,
+    max_layers: int | None = 5,
+    visible_layers: int | None = None,
+    layer_selection: str = "most_divergent",
+    analysis_topk: int | None = None,
+    x_tick_mode: str = "prompt",
+    model_a_label: str | None = None,
+    model_b_label: str | None = None,
+) -> go.Figure:
+    del analysis_topk, x_tick_mode
+    display_top_tokens = visible_cell_tokens if visible_cell_tokens is not None else display_top_tokens
+    max_layers = visible_layers if visible_layers is not None else max_layers
+    if display_top_tokens <= 1:
+        layout_scale = "top1"
+    elif display_top_tokens <= 5:
+        layout_scale = "top5"
+    else:
+        layout_scale = "top10"
+    if layout_scale == "top1":
+        effective_max_token_chars = min(max_token_chars, 8)
+    elif layout_scale == "top5":
+        effective_max_token_chars = min(max_token_chars, 10)
+    else:
+        effective_max_token_chars = max_token_chars
+    data = _prepare_heatmap_data(
+        payload_or_path,
+        prompt_index=prompt_index,
+        prompt_text=prompt_text,
+        include_prompt_tokens=include_prompt_tokens,
+        include_generated_tokens=include_generated_tokens,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        display_top_tokens=display_top_tokens,
+        max_token_chars=effective_max_token_chars,
+        max_layers=max_layers,
+        layer_selection=layer_selection,
+    )
+
+    num_layers, num_positions = data["z"].shape
+    shared_line_count = max(1, (display_top_tokens + 1) // 2)
+    nonshared_line_count = max(1, display_top_tokens)
+    line_count = shared_line_count + nonshared_line_count
+    if layout_scale == "top1":
+        annotation_font_size = max(22, min(26, int(192 / max(1, line_count))))
+    elif layout_scale == "top5":
+        annotation_font_size = max(18, min(22, int(214 / max(1, line_count))))
+    else:
+        annotation_font_size = max(17, min(21, int(228 / max(1, line_count))))
+    max_x_label_len = max((len(label) for label in data["x_labels"]), default=1)
+    max_y_label_len = max((len(label) for label in data["y_labels"]), default=1)
+    longest_visible_token = 1
+    longest_visible_line = 1
+    for row_idx in range(num_layers):
+        for col_idx in range(num_positions):
+            parts = data["cell_parts"][row_idx, col_idx]
+            if parts is None:
+                continue
+            visible_tokens = (
+                parts["shared"][:display_top_tokens]
+                + parts["base_only"][:display_top_tokens]
+                + parts["finetuned_only"][:display_top_tokens]
+            )
+            if visible_tokens:
+                longest_visible_token = max(longest_visible_token, max(len(token) for token in visible_tokens))
+            for idx in range(display_top_tokens):
+                left = parts["base_only"][idx] if idx < len(parts["base_only"]) else "—"
+                right = parts["finetuned_only"][idx] if idx < len(parts["finetuned_only"]) else "—"
+                longest_visible_line = max(longest_visible_line, len(f"'{left}' <> '{right}'"))
+    base_cell_w = 48 + max(max_x_label_len * 5, longest_visible_token * 10, longest_visible_line * 7)
+    if layout_scale == "top1":
+        cell_w = max(184, min(360, base_cell_w + 16))
+    elif layout_scale == "top5":
+        cell_w = max(170, min(348, base_cell_w + 8))
+    else:
+        cell_w = max(160, min(340, base_cell_w))
+    if layout_scale == "top1":
+        cell_h = max(96, int(line_count * (annotation_font_size * 1.18) + 12))
+    elif layout_scale == "top5":
+        cell_h = max(88, int(line_count * (annotation_font_size * 1.11) + 11))
+    else:
+        cell_h = max(82, int(line_count * (annotation_font_size * 1.08) + 10))
+    left_margin = max(130, min(220, 85 + max_y_label_len * 4))
+    right_margin = 110 if show_marginals else 120
+    base_bottom_margin = max(130, min(180, 82 + max_x_label_len * 3))
+    top_label_max_len = max((len(label) for label in data["x_labels_secondary"]), default=0)
+    top_tick_font_size = 34 if top_label_max_len <= 16 else 32 if top_label_max_len <= 24 else 30
+    top_axis_title_font_size = 32 if top_label_max_len <= 16 else 30 if top_label_max_len <= 24 else 28
+    if layout_scale == "top1":
+        bottom_margin = base_bottom_margin + 72
+        top_margin = 280 if data["x_labels_secondary"] is not None else 190
+    elif layout_scale == "top5":
+        bottom_margin = base_bottom_margin + 60
+        top_margin = 292 if data["x_labels_secondary"] is not None else 198
+    else:
+        bottom_margin = base_bottom_margin + 60
+        top_margin = 306 if data["x_labels_secondary"] is not None else 206
+    width = max(960, left_margin + right_margin + num_positions * cell_w + (170 if show_marginals else 0))
+    extra_height = 46 if layout_scale == "top1" else (38 if layout_scale == "top5" else 30)
+    height = max(420, top_margin + bottom_margin + num_layers * cell_h + (90 if show_marginals else 0) + extra_height)
+
+    zmin = 0.0
+    zmax = 1.0
+    heatmap_text = np.empty_like(data["cell_parts"], dtype=object)
+    for row_idx in range(num_layers):
+        for col_idx in range(num_positions):
+            parts = data["cell_parts"][row_idx, col_idx]
+            if parts is None:
+                heatmap_text[row_idx, col_idx] = ""
+                continue
+            color = _text_color_for_value(
+                float(data["z"][row_idx, col_idx]),
+                colorscale=colorscale,
+                zmin=zmin,
+                zmax=zmax,
+            )
+            heatmap_text[row_idx, col_idx] = (
+                f"<span style='color:{color}'>"
+                f"{_cell_annotation_html(parts, visible_rows=display_top_tokens)}"
+                f"</span>"
+            )
+
+    if show_marginals:
+        fig = make_subplots(
+            rows=2,
+            cols=2,
+            row_heights=[0.08, 0.92],
+            column_widths=[0.86, 0.14],
+            specs=[[{"type": "xy"}, None], [{"type": "heatmap"}, {"type": "xy"}]],
+            horizontal_spacing=0.015,
+            vertical_spacing=0.02,
+        )
+        main_row, main_col = 2, 1
+    else:
+        fig = make_subplots(rows=1, cols=1)
+        main_row, main_col = 1, 1
+
+    fig.add_trace(
+        go.Heatmap(
+            z=data["z"],
+            x=list(range(num_positions)),
+            y=list(range(num_layers)),
+            zmin=zmin,
+            zmax=zmax,
+            colorscale=colorscale,
+            xgap=1,
+            ygap=1,
+            text=heatmap_text,
+            texttemplate="%{text}",
+            textfont={
+                "family": "Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                "size": annotation_font_size,
+            },
+            hovertext=data["hover_text"],
+            hoverinfo="text",
+            showscale=True,
+            colorbar={
+                "title": {
+                    "text": "IoU",
+                    "font": {
+                        "size": 32,
+                        "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                    },
+                },
+                "orientation": "v",
+                "thickness": 18,
+                "len": 0.82,
+                "x": 1.02,
+                "xanchor": "left",
+                "y": 0.5,
+                "yanchor": "middle",
+                "tickfont": {
+                    "size": 26,
+                    "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                },
+            },
+        ),
+        row=main_row,
+        col=main_col,
+    )
+
+    if show_marginals:
+        fig.add_trace(
+            go.Bar(
+                x=list(range(num_positions)),
+                y=data["mean_per_position"],
+                marker_color="#c7c7c7",
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=1,
+            col=1,
+        )
+        fig.add_trace(
+            go.Bar(
+                x=data["mean_per_layer"],
+                y=list(range(num_layers)),
+                orientation="h",
+                marker_color="#c7c7c7",
+                hoverinfo="skip",
+                showlegend=False,
+            ),
+            row=2,
+            col=2,
+        )
+
+    fig.update_xaxes(
+        tickmode="array",
+        tickvals=list(range(num_positions)),
+        ticktext=data["x_labels"],
+        tickangle=32,
+        side="bottom",
+        automargin=True,
+        tickfont={
+            "size": 32,
+            "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+        },
+        range=[-0.5, num_positions - 0.5],
+        showgrid=False,
+        zeroline=False,
+        row=main_row,
+        col=main_col,
+    )
+    fig.update_yaxes(
+        tickmode="array",
+        tickvals=list(range(num_layers)),
+        ticktext=data["y_labels"],
+        tickfont={
+            "size": 34,
+            "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+        },
+        automargin=True,
+        range=[-0.5, num_layers - 0.5],
+        showgrid=False,
+        zeroline=False,
+        row=main_row,
+        col=main_col,
+    )
+
+    if data["x_labels_secondary"]:
+        main_yaxis_ref = fig.data[0].yaxis if getattr(fig.data[0], "yaxis", None) else "y"
+        fig.add_trace(
+            go.Scatter(
+                x=list(range(num_positions)),
+                y=[None] * num_positions,
+                mode="markers",
+                marker_opacity=0,
+                showlegend=False,
+                hoverinfo="skip",
+                xaxis="x2",
+                yaxis=main_yaxis_ref,
+            )
+        )
+        fig.update_layout(
+            xaxis2={
+                "anchor": "y",
+                "overlaying": "x",
+                "side": "top",
+                "tickmode": "array",
+                "tickvals": list(range(num_positions)),
+                "ticktext": data["x_labels_secondary"],
+                "tickangle": 32,
+                "tickfont": {
+                    "size": top_tick_font_size,
+                    "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                },
+                "range": [-0.5, num_positions - 0.5],
+                "automargin": True,
+                "showgrid": False,
+                "zeroline": False,
+            }
+        )
+
+    if show_marginals:
+        fig.update_xaxes(showticklabels=False, row=1, col=1)
+        fig.update_yaxes(showticklabels=False, row=2, col=2)
+        fig.update_yaxes(range=[-0.5, num_layers - 0.5], row=2, col=2)
+
+    model_meta = data["payload"].get("metadata", {})
+    model_a = _compact_model_label(model_a_label or model_meta.get("base_model_name"), "Base")
+    model_b = _compact_model_label(model_b_label or model_meta.get("finetuned_model_name"), "Finetuned")
+    prompt_title = data["display_prompt"]
+    top_k = model_meta.get("top_k", display_top_tokens)
+    if title is not None:
+        full_title_text = title
+    else:
+        full_title_text = (
+            f"{model_a} <> {model_b}"
+            f"<br><sup>{prompt_title} | Top-{top_k} Jaccard (IoU)</sup>"
+        )
+    if layout_scale == "top1":
+        title_font_size = 42 if len(prompt_title) <= 160 else 40 if len(prompt_title) <= 220 else 38
+    elif layout_scale == "top5":
+        title_font_size = 40 if len(prompt_title) <= 160 else 38 if len(prompt_title) <= 220 else 36
+    else:
+        title_font_size = 38 if len(prompt_title) <= 140 else 36 if len(prompt_title) <= 200 else 34
+    if data["x_labels_secondary"]:
+        top_margin = max(top_margin, 118 + top_tick_font_size + top_axis_title_font_size + title_font_size + 2)
+
+    fig.update_layout(
+        title={
+            "text": full_title_text,
+            "x": 0.5,
+            "xanchor": "center",
+            "y": 0.985,
+            "yanchor": "top",
+            "font": {
+                "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                "size": title_font_size,
+                "color": "black",
+            },
+        },
+        width=width,
+        height=height,
+        autosize=False,
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        font={"family": "Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif", "size": 22, "color": "black"},
+        margin={"l": left_margin, "r": right_margin, "t": top_margin, "b": bottom_margin},
+        hoverlabel={
+            "font": {"color": "black", "size": 12},
+            "bgcolor": "white",
+            "bordercolor": "black",
+            "align": "left",
+        },
+        hovermode="closest",
+        hoverdistance=5,
+        annotations=[],
+    )
+
+    fig.update_xaxes(
+        title={
+            "text": "Predictor token (input tokens minus last token)",
+            "font": {
+                "size": 34,
+                "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+            },
+            "standoff": 10,
+        },
+        row=main_row,
+        col=main_col,
+    )
+    fig.update_yaxes(
+        title={
+            "text": "Layer",
+            "font": {
+                "size": 30,
+                "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+            },
+            "standoff": 10,
+        },
+        row=main_row,
+        col=main_col,
+    )
+
+    if data["x_labels_secondary"]:
+        fig.update_layout(
+            xaxis2={
+                **fig.layout.xaxis2.to_plotly_json(),
+                "title": {
+                    "text": "Target token (input tokens minus first token)",
+                    "font": {
+                        "size": top_axis_title_font_size,
+                        "family": "Noto Sans SemiBold, Noto Sans, DejaVu Sans, Arial, Helvetica, sans-serif",
+                    },
+                    "standoff": 0,
+                },
+            }
+        )
+
+    return fig
+
+
+plot_jaccard_heatmap_interactive = plot_jaccard_heatmap
+
+
+def save_jaccard_heatmap_html(payload_or_path, output_path, **kwargs):
+    fig = plot_jaccard_heatmap(payload_or_path, **kwargs)
+    return save_plotly_figure(fig, output_path, format="html")
+
+
+def save_jaccard_heatmap_pdf(payload_or_path, output_path, **kwargs):
+    fig = plot_jaccard_heatmap(payload_or_path, **kwargs)
+    return save_plotly_figure(fig, output_path, format="pdf")
+
+
+def save_jaccard_heatmap(payload_or_path, output_prefix, **kwargs):
+    output_prefix = Path(output_prefix)
+    pdf_path = save_jaccard_heatmap_pdf(payload_or_path, output_prefix.with_suffix(".pdf"), **kwargs)
+    html_path = save_jaccard_heatmap_html(payload_or_path, output_prefix.with_suffix(".html"), **kwargs)
+    return {"pdf": pdf_path, "html": html_path}
+
+
+__all__ = [
+    "plot_jaccard_heatmap",
+    "plot_jaccard_heatmap_interactive",
+    "save_jaccard_heatmap",
+    "save_jaccard_heatmap_html",
+    "save_jaccard_heatmap_pdf",
+]

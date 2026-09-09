@@ -209,6 +209,7 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
         max_new_tokens:int=10,
         temperature:float=1.0,
         do_sample:bool=True,
+        seed:int|None=None,
         use_cache:bool=False,
         output_hidden_states:bool=False,
     ) -> Dict[str, Any]:
@@ -224,6 +225,10 @@ class CustomGenerationLensWrapper(BaseLensWrapper):
             )
 
         self.model.eval()
+        if seed is not None:
+            torch.manual_seed(int(seed))
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(int(seed))
         generated = input_ids.detach().clone()
         generated_attention_mask = (
             attention_mask.detach().clone()
